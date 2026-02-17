@@ -25,7 +25,3 @@ Identifying available fitness classes for booking
 **Success guarantee/Postconditions**
 1) A member proceeds to book for a class of their choice that doesn't conflict with previous bookings.
 2) A user sign-ups to be able to book available classes of their choice
-
-
-
-
