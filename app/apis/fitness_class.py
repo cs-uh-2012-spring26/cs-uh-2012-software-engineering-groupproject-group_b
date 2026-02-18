@@ -1,34 +1,32 @@
 from flask_restx import Namespace, Resource, fields
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.apis import MSG
 from app.db.classes import ClassResource
 from app.db.users import UserResource
 
 from http import HTTPStatus
-from flask import request
 
 api = Namespace("classes", description="Endpoint for classes")
 
-BOOK_CLASS_REQ = api.model(
-    "BookClassRequest",
-    {
-        "user_id": fields.String(
-            required=True,
-            description="User id booking the class",
-            example="65f0c2a2c9b3f4b2a6f2d111",
-        )
-    },
+_UNAUTHORIZED_RESPONSE = api.model(
+    "BookClassUnauthorized", {MSG: fields.String(example="Missing or invalid token")}
 )
 
 @api.route("/<class_id>/book")
 @api.param("class_id", "Class id to book")
 class ClassBooking(Resource):
 
-    @api.expect(BOOK_CLASS_REQ)
-
+    @jwt_required()
+    @api.doc(security="Bearer")
     @api.response(
         HTTPStatus.OK,
         "Booked",
         api.model("BookClassOK", {MSG: fields.String(example="Booked successfully")}),
+    )
+    @api.response(
+        HTTPStatus.UNAUTHORIZED,
+        "Unauthorized — valid JWT required",
+        _UNAUTHORIZED_RESPONSE,
     )
     @api.response(
         HTTPStatus.NOT_FOUND,
@@ -36,22 +34,13 @@ class ClassBooking(Resource):
         api.model("BookClassNotFound", {MSG: fields.String(example="Class not found")}),
     )
     @api.response(
-        HTTPStatus.NOT_ACCEPTABLE,
-        "Bad Request",
-        api.model("BookClassBadRequest", {MSG: fields.String(example="Invalid value provided")}),
-    )
-    @api.response(
         HTTPStatus.CONFLICT,
         "Conflict",
         api.model("BookClassConflict", {MSG: fields.String(example="Class is full / already booked")}),
     )
     def post(self, class_id):
-        assert isinstance(request.json, dict)
-
-        user_id = request.json.get("user_id")
-
-        if not (isinstance(user_id, str) and len(user_id) > 0):
-            return {MSG: "Invalid value provided"}, HTTPStatus.NOT_ACCEPTABLE
+        """Book a class. Requires a valid member JWT (Bearer token)."""
+        user_id = get_jwt_identity()
 
         user_resource = UserResource()
         user = user_resource.get_user_by_id(user_id)

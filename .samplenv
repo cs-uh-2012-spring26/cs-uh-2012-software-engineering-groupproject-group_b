@@ -17,3 +17,6 @@ MOCK_DB="false"
 
 # server config
 DEBUG="true"
+
+# JWT authentication — use a long, random string in production
+JWT_SECRET_KEY="change-me-to-a-long-random-secret"
