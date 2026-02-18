@@ -1,5 +1,6 @@
 from app.apis.student import api as student_ns
 from app.apis.hello import api as hello_ns
+from app.apis.class_members import api as class_members_ns
 from app.apis.fitness_class import api as class_ns
 from app.apis.user import api as user_ns
 from app.config import Config
@@ -25,6 +26,7 @@ def create_app():
     api.init_app(app)
     api.add_namespace(student_ns)
     api.add_namespace(hello_ns)
+    api.add_namespace(class_members_ns)
     api.add_namespace(class_ns)
     api.add_namespace(user_ns)
     @api.errorhandler(Exception)

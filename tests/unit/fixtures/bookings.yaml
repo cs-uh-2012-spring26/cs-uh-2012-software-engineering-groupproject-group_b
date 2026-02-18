@@ -1,0 +1,16 @@
+# Two members booked into class_abc123
+- class_id: "class_abc123"
+  user_name: "Alice Johnson"
+  user_email: "alice@example.com"
+  user_contact: "+1-555-0101"
+
+- class_id: "class_abc123"
+  user_name: "Bob Smith"
+  user_email: "bob@example.com"
+  user_contact: "+1-555-0102"
+
+# One member booked into a different class
+- class_id: "class_xyz789"
+  user_name: "Carol White"
+  user_email: "carol@example.com"
+  user_contact: "+1-555-0103"
