@@ -1,5 +1,6 @@
 from app.db.utils import serialize_item, serialize_items
 from app.db import DB
+from bson import ObjectId
 
 # User collection name and fields
 USER_COLLECTION = "users"
@@ -48,3 +49,39 @@ class UserResource:
         }
         result = self.collection.insert_one(user)
         return result.inserted_id
+
+    def get_user_by_id(self,user_id: str):
+        """
+        Find ONE user document by its Mongo _id.
+
+        Returns:
+            dict (serialized) if found, else None
+        """
+        try:
+            oid = ObjectId(user_id) 
+        except Exception:
+            return None
+
+        user = self.collection.find_one({"_id": oid}) 
+        return serialize_item(user)
+    
+    def add_class_to_user(self, user_id: str, class_id: str):
+        """
+        Add a class id into the user's class_ids list.
+
+        Uses $addToSet so the same class id can't be added twice.
+
+        Returns:
+            True if user exists and update happened, False otherwise
+        """
+        try:
+            user_oid = ObjectId(user_id)
+            class_oid = ObjectId(class_id)
+        except Exception:
+            return False
+
+        result = self.collection.update_one(
+            {"_id": user_oid},                   
+            {"$addToSet": {USER_CLASS_IDS: class_oid}}, 
+        )
+        return result.matched_count == 1
