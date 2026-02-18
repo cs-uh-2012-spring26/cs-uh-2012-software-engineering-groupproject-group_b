@@ -38,3 +38,6 @@ class ClassResource:
         }
         result = self.collection.insert_one(class_doc)
         return result.inserted_id
+    def get_class(self):
+        class_doc = self.collection.find({})
+        return serialize_items(list(class_doc))
