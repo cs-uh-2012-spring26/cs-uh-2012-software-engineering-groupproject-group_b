@@ -11,6 +11,7 @@ CLASS_END_TIME = "end_time"
 CLASS_DESCRIPTION = "description"
 CLASS_ROOM_NUMBER = "room_number"
 CLASS_CAPACITY = "capacity"
+TRAINER_NAME = "trainer_name"
 
 CLASS_USER_IDS = "user_ids"
 

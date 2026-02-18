@@ -1,7 +1,8 @@
 from flask_restx import Namespace, Resource, fields
 from app.apis import MSG
 from app.db.classes import ClassResource
-from app.db.classes import CLASS_NAME, CLASS_DESCRIPTION, CLASS_ROOM_NUMBER, CLASS_START_TIME, CLASS_END_TIME, CLASS_CAPACITYfrom app.db.users import UserResource
+from app.db.classes import CLASS_NAME, TRAINER_NAME, CLASS_DESCRIPTION, CLASS_ROOM_NUMBER, CLASS_START_TIME, CLASS_END_TIME, CLASS_CAPACITY
+from app.db.users import UserResource
 
 from http import HTTPStatus
 from flask import request
@@ -12,10 +13,12 @@ api = Namespace("classes", description="Endpoint for classes")
 _EXAMPLE_CLASS_1 = {
     CLASS_NAME: "Yoga",
     CLASS_DESCRIPTION: "Yoga class",
+    TRAINER_NAME: "John",
     CLASS_START_TIME: "10:00",
     CLASS_END_TIME: "11:00",
     CLASS_ROOM_NUMBER: "101",
     CLASS_CAPACITY: 10,
+    
 }
 
 CLASS_CREATE_FLDS = api.model(
@@ -23,6 +26,7 @@ CLASS_CREATE_FLDS = api.model(
     {
         CLASS_NAME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_NAME], required=True),
         CLASS_DESCRIPTION: fields.String(example=_EXAMPLE_CLASS_1[CLASS_DESCRIPTION], required=True),
+        TRAINER_NAME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_DESCRIPTION], required=True),
         CLASS_START_TIME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_START_TIME], required=True),
         CLASS_END_TIME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_END_TIME], required=True),
         CLASS_ROOM_NUMBER: fields.String(example=_EXAMPLE_CLASS_1[CLASS_ROOM_NUMBER], required=True),
@@ -50,6 +54,7 @@ class CreateClass(Resource):
 
         name = data.get(CLASS_NAME)
         description = data.get(CLASS_DESCRIPTION)
+        trainer_name = data.get(TRAINER_NAME)
         start_time = data.get(CLASS_START_TIME)
         end_time = data.get(CLASS_END_TIME)
         room_number = data.get(CLASS_ROOM_NUMBER)
@@ -86,6 +91,8 @@ class CreateClass(Resource):
         class_id = class_resource.create_class(name, start_time, end_time, description, room_number, capacity)
         return {MSG: f"Class created with id: {class_id}"}, HTTPStatus.OK
 
+
+# CLASS BOOKING ENDPOINT
 BOOK_CLASS_REQ = api.model(
     "BookClassRequest",
     {
