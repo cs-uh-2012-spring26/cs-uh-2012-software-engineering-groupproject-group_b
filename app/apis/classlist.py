@@ -11,9 +11,8 @@ from flask import request
 api = Namespace("classes", description="Endpoint for fitness classlist")
 
 _EXAMPLE_CLASS_1 = {
-    # "Class_id":"yoga",
     "Class_name": "Morning_yoga",
-    # "Trainer_name": "Mary",
+    "Trainer_name": "Mary",
     "class_start_time": "7:00 AM",
     "Class_end_time": "8:00 AM",
     "Class_description": "Yoga for beginners",
@@ -23,9 +22,8 @@ _EXAMPLE_CLASS_1 = {
 }
 
 _EXAMPLE_CLASS_2 = {
-    # "Class_id":"train",
     "Class_name": "HIIT",
-    # "Trainer_name": "Mary",
+    "Trainer_name": "Mary",
     "class_start_time": "7:00 PM",
     "Class_end_time": "8:00 PM",
     "Class_description": "full_workout",
@@ -37,10 +35,9 @@ _EXAMPLE_CLASS_2 = {
 CLASS_MODEL = api.model(
     "ClassListItem",  # name of the model which shows up in swagger
     {
-        # "Class_id": fields.String(description="Unique ID of the class"),
         "Class_name": fields.String(description="Name of the class"),
 
-        # "Trainer name": fields.String(description="Name of the trainer"),
+        "Trainer name": fields.String(description="Name of the trainer"),
 
         "Class_start_time": fields.String(description="When the class begins"),
 
