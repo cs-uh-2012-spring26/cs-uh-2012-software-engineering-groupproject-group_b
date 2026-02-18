@@ -1,0 +1,113 @@
+# Import all required tools to create rest APIs
+from flask_restx import Namespace, Resource, fields
+from app.apis import MSG
+from app.db import DB
+from app.db.classes import ClassResource
+from app.db.classes import CLASS_NAME, CLASS_START_TIME, CLASS_END_TIME, CLASS_DESCRIPTION, CLASS_ROOM_NUMBER, CLASS_CAPACITY
+from datetime import datetime
+from http import HTTPStatus
+from flask import request
+
+api = Namespace("classes", description="Endpoint for fitness classlist")
+
+_EXAMPLE_CLASS_1 = {
+    # "Class_id":"yoga",
+    "Class_name": "Morning_yoga",
+    # "Trainer_name": "Mary",
+    "class_start_time": "7:00 AM",
+    "Class_end_time": "8:00 AM",
+    "Class_description": "Yoga for beginners",
+    "Class_room_number": "100",
+    "Class_capacity": 15,
+    "Class_status": "Open"
+}
+
+_EXAMPLE_CLASS_2 = {
+    # "Class_id":"train",
+    "Class_name": "HIIT",
+    # "Trainer_name": "Mary",
+    "class_start_time": "7:00 PM",
+    "Class_end_time": "8:00 PM",
+    "Class_description": "full_workout",
+    "Class_room_number": "101",
+    "Class_capacity": 20,
+    "Class_status": "Closed"
+}
+
+CLASS_MODEL = api.model(
+    "ClassListItem",  # name of the model which shows up in swagger
+    {
+        # "Class_id": fields.String(description="Unique ID of the class"),
+        "Class_name": fields.String(description="Name of the class"),
+
+        # "Trainer name": fields.String(description="Name of the trainer"),
+
+        "Class_start_time": fields.String(description="When the class begins"),
+
+        "Class_end_time": fields.String(description="When the class ends"),
+
+        "Class_description": fields.String(description="What the class is about"),
+
+        "Class_room_number": fields.String(description="class location"),
+
+        "Class_capacity": fields.Integer(description="Class total capacity"),
+
+        "Class_status": fields.String(description="Class open or closed", enum=["Open", "Closed"])
+
+    }
+)
+
+
+@api.route("")
+# The resource handler for the class list endpoint. this class handles GET requests for fetching up
+# upcoming classes
+class ClassList(Resource):
+    @api.marshal_list_with(CLASS_MODEL)
+    # Possible resposne in Swagger
+    @api.response(HTTPStatus.OK, "Success-List of upcoming classes returned")
+    def get(self):
+
+        # Get list of upcoming fitness classes. return all fitness classes regardless of their status
+        # Guest/Members can see the complete list of all available options
+        # Classes are sorted by their start time
+
+        # This endpoint doesn't accept query parameters
+
+        now = datetime.now()  # get current time to filter for upcoming classes
+
+        classes = DB.get_collection("classes")
+        # if collection doesn't exist, return empty collection
+        if classes is None:
+            return []
+
+        cursor = classes.find({
+            "start_time": {"$gte": now}  # Get only future classes
+        }).sort("start_time", 1)  # start woth the earliest class
+
+        # convert to list
+        all_classes = list(cursor)
+
+        # transform each class to match class model
+
+        result = []
+        for c in all_classes:
+            # Calculate class status based on bookings and capacity
+
+            booked = len(c.get("user_ids", []))
+            capacity = c.get("capacity", 0)
+            status = "Closed" if booked >= capacity else "Open"
+
+            # response for class list
+
+            result.append({
+
+                "Class_name": c.get("name", ""),
+                "Class_start_Time": str(c.get("start_time", "")),
+                "Class_end_time": str(c.get("end_time", "")),
+                "Class_description": c.get("description", ""),
+                "Class_room_number": c.get("room_number", ""),
+                "Class_capacity": capacity,
+                "Class_status": "Closed" if booked >= capacity else "Open"
+            })
+
+        return result
