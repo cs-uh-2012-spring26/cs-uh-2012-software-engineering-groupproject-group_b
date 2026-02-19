@@ -1,3 +1,8 @@
+# Use Case Diagram
+
+![Use Case Diagram](assets/uml-case-diagram.svg)
+# Case Specifications for each feature
+
 # Case Specifications for each feature
 
 ## Feature 1: Create Class
