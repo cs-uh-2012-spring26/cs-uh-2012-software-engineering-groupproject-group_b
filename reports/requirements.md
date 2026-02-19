@@ -1,7 +1,78 @@
+# Requirements Elicitation and Analysis
+
+## Client Meeting (Date/Time):
+We met with the client, Raania, on Thursday, Feb 12, 2026, from 2:00 PM to 2:30 PM.
+
+## Elicitation Techniques Used: 
+We used a semi-structured interview approach. Before the meeting, each team member prepared a set of planned questions for the four features (Create Class, View Class List, Book a Class, and View Member/Guest List). During the meeting, we asked follow-up questions whenever requirements were unclear or when the client introduced a new constraint. We also used our written feature descriptions and use-case prompts (e.g., “what happens when capacity is full?”) to guide the discussion and confirm edge cases.
+
+## Reflection on Technique (Usefulness / What We’d Change):
+The semi-structured interview was effective because it gave us a clear structure while still allowing flexibility to clarify requirements in real time. It helped us uncover important constraints (e.g. role permissions and capacity behavior) and confirm scope boundaries for Sprint 1. If we were to improve the process, we would bring a simple visual flow or quick use-case sketch (e.g.booking flow diagram) to confirm system behavior faster and reduce back-and-forth on edge cases.
+
+## Important Clarification Gained
+A key clarification from the meeting was the distinction between user roles and permissions. Specifically, we learned that trainers/admins can create classes, members can book classes with no booking limit, and guests can view class listings (including full classes) but cannot book without signing up/logging in. This defines who is allowed to book and what the system should do when a user does not have the required role.
+
+After the client meeting, our team coordinated implementation through internal check-ins on Feb 13, Feb 18, and Feb 19 to align feature ownership and ensure requirements were implemented consistently across endpoints.
+
+## Client Meeting Questions & Answers
+Q: Who are the system users?
+→ Guest, Member, Trainer/Admin
+Q: What is the difference between roles?
+ → Trainer/Admin manages classes
+ → Member can register for classes
+ → Guest can only view classes and must sign up/login to book
+Q: What user details should be stored?
+ → Name, email address, contact information
+Q: What information should a class contain?
+ → Name, description, start time, end time, room number, capacity
+Q: Should users receive system feedback?
+ → Yes — show success/error messages
+
+**Feature 1 - Create Class**
+Q: Who can create a class?
+ → Trainer/Admin only
+Q: How many classes can a trainer create?
+ → No limit
+Q: Who decides class capacity?
+ → Trainer decides
+Q: What happens if capacity is reached?
+ → No more users can register
+Q: Can classes overlap in time?
+ → Yes (no validation required in this sprint)
+Q: Should we validate date/time conflicts?
+ → No validation required
+
+**Feature 2 - View Class List**
+Q: Who can view class listings?
+ → Guests and Members
+Q: Time range of classes shown?
+ → Upcoming classes within a week
+Q: Should full classes still be visible?
+ → Yes, visible but marked closed/full
+Q: Should filtering exist?
+ → Not required in this sprint
+
+ **Feature 3 - Book a Class**
+Q: Who can book a class?
+ → Members only (Guests must sign up/login first)
+Q: Is there a limit to how many classes a member can book?
+ → No limit
+Q: Can members book overlapping classes?
+ → Yes
+Q: What happens when capacity is full?
+ → Booking rejected
+
+**Feature 4 - View Member List**
+Q: Who can view booked users?
+ → Trainer/Admin
+Q: What information should be visible?
+ → Name, email, contact
+Q: Does the list need download/export?
+ → Viewing only is sufficient
+
 # Use Case Diagram
 
 ![Use Case Diagram](assets/uml_case_diagram.svg)
-# Case Specifications for each feature
 
 # Case Specifications for each feature
 
