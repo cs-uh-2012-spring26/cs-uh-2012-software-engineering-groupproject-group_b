@@ -123,6 +123,8 @@ A1: Class is full
 3. The user's booked class list includes the class
 4. The class capacity is not exceeded
 
+---
+
 ## Feature 4: View Member/Guest List of a Class
 
 **User story: As a class trainer or center admin, I want to view who has booked a spot in my class.**
