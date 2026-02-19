@@ -1,6 +1,6 @@
 # Use Case Diagram
 
-![Use Case Diagram](assets/uml-case-diagram.svg)
+![Use Case Diagram](assets/uml_case_diagram.svg)
 # Case Specifications for each feature
 
 # Case Specifications for each feature
