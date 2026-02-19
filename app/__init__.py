@@ -7,6 +7,7 @@ from app.db import DB
 
 from http import HTTPStatus
 from flask import Flask
+from flask_jwt_extended import JWTManager
 from flask_restx import Api
 
 
@@ -15,11 +16,20 @@ def create_app():
     app.config.from_object(Config)
 
     DB.init_app(app)
+    JWTManager(app)
 
     api = Api(
         title="Students",
         version="1.0",
         description="A simple student record keeping API",
+        authorizations={
+            "Bearer": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "Authorization",
+                "description": "Paste your JWT as: Bearer &lt;token&gt;",
+            }
+        },
     )
 
     api.init_app(app)
