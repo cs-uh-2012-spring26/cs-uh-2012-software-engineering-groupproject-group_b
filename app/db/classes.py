@@ -6,6 +6,7 @@ from bson import ObjectId
 # Class collection
 CLASS_COLLECTION = "classes"
 CLASS_NAME = "name"
+TRAINER_NAME = "trainer_name"
 CLASS_START_TIME = "start_time"
 CLASS_END_TIME = "end_time"
 CLASS_DESCRIPTION = "description"
@@ -21,6 +22,7 @@ class ClassResource:
     def create_class(
         self,
         name: str,
+        trainer_name:str,
         start_time: str,
         end_time: str,
         description: str,
@@ -30,9 +32,10 @@ class ClassResource:
     ):
         class_doc = {
             CLASS_NAME: name,
+            CLASS_DESCRIPTION: description,
+            TRAINER_NAME: trainer_name,
             CLASS_START_TIME: start_time,
             CLASS_END_TIME: end_time,
-            CLASS_DESCRIPTION: description,
             CLASS_ROOM_NUMBER: room_number,
             CLASS_CAPACITY: capacity,
             CLASS_USER_IDS: user_ids or [],
