@@ -65,6 +65,14 @@ class UserResource:
         user = self.collection.find_one({"_id": oid}) 
         return serialize_item(user)
     
+    def get_users_by_ids(self, user_oids: list) -> list:
+        """
+        Fetch multiple users by a list of ObjectIds (not strings).
+        Returns a list of serialized user dicts.
+        """
+        users = self.collection.find({"_id": {"$in": user_oids}})
+        return serialize_items(list(users))
+
     def add_class_to_user(self, user_id: str, class_id: str):
         """
         Add a class id into the user's class_ids list.
