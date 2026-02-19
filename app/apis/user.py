@@ -1,7 +1,7 @@
 from http import HTTPStatus
 
 from flask import request
-from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token, jwt_required
 from flask_restx import Namespace, Resource, fields
 
 from app.apis import MSG
@@ -141,6 +141,49 @@ class MemberLogin(Resource):
             additional_claims={"role": MEMBER_ROLE},
         )
         return {"access_token": token, MSG: "Login successful"}, HTTPStatus.OK
+
+
+# ---------------------------------------------------------------------------
+# POST /users/trainer/register  — create a new trainer account (trainer only)
+# ---------------------------------------------------------------------------
+
+
+@api.route("/trainer/register")
+class TrainerRegister(Resource):
+    @api.expect(_REGISTER_MODEL)
+    @api.response(
+        HTTPStatus.CREATED,
+        "Trainer registered successfully",
+        api.model("TrainerRegisterOK", {MSG: fields.String()}),
+    )
+    @api.response(HTTPStatus.BAD_REQUEST, "Missing or invalid fields", _ERROR_RESPONSE)
+    @api.response(HTTPStatus.CONFLICT, "Email already registered", _ERROR_RESPONSE)
+    def post(self):
+        """Register a new trainer account."""
+        assert isinstance(request.json, dict)
+
+        name = request.json.get("name", "").strip()
+        email = request.json.get("email", "").strip()
+        password = request.json.get("password", "")
+
+        if not name or not email or not password:
+            return (
+                {MSG: "name, email, and password are all required"},
+                HTTPStatus.BAD_REQUEST,
+            )
+
+        user_resource = UserResource()
+        user_id, error = user_resource.register_trainer(name, email, password)
+
+        if error is not None:
+            status = (
+                HTTPStatus.CONFLICT
+                if "already exists" in error
+                else HTTPStatus.BAD_REQUEST
+            )
+            return {MSG: error}, status
+
+        return {MSG: f"Trainer registered with id: {user_id}"}, HTTPStatus.CREATED
 
 
 # ---------------------------------------------------------------------------

@@ -197,13 +197,40 @@ class UserResource:
 
         return serialize_item(user), None
 
+    def register_trainer(self, name: str, email: str, password: str):
+        """
+        Register a new trainer account.
+
+        Same password policy as members. Only callable by an existing trainer
+        (enforced at the API layer).
+
+        Returns:
+            (str inserted_id, None)      – success
+            (None, str error_message)    – failure
+        """
+        valid, reason = validate_password(password)
+        if not valid:
+            return None, reason
+
+        if self.get_user_by_email(email) is not None:
+            return None, "A user with that email already exists"
+
+        pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+        user = {
+            USER_NAME: name,
+            USER_EMAIL: email,
+            USER_ROLE: TRAINER_ROLE,
+            USER_PASSWORD_HASH: pw_hash,
+            USER_CLASS_IDS: [],
+        }
+        result = self.collection.insert_one(user)
+        return str(result.inserted_id), None
+
     # ------------------------------------------------------------------
     # Class enrollment
     # ------------------------------------------------------------------
 
-        user = self.collection.find_one({"_id": oid}) 
-        return serialize_item(user)
-    
     def get_users_by_ids(self, user_oids: list) -> list:
         """
         Fetch multiple users by a list of ObjectIds (not strings).
