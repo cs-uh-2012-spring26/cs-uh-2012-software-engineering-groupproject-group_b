@@ -1,9 +1,21 @@
+from datetime import datetime
+
+from flask import request
+from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from flask_restx import Namespace, Resource, fields
-from flask_jwt_extended import jwt_required, get_jwt_identity
+
 from app.apis import MSG
-from app.db.classes import ClassResource
+from app.db.classes import (
+    CLASS_CAPACITY,
+    CLASS_DESCRIPTION,
+    CLASS_END_TIME,
+    CLASS_NAME,
+    CLASS_ROOM_NUMBER,
+    CLASS_START_TIME,
+    TRAINER_NAME,
+    ClassResource,
+)
 from app.db.users import UserResource
-from app.db.classes import CLASS_NAME,CLASS_DESCRIPTION,TRAINER_NAME,CLASS_START_TIME,CLASS_END_TIME,CLASS_ROOM_NUMBER,CLASS_CAPACITY
 from http import HTTPStatus
 
 api = Namespace("classes", description="Endpoint for classes")
@@ -91,14 +103,23 @@ CLASS_CREATE_FLDS = api.model(
 
 @api.route("/")
 class CreateClass(Resource):
+    @jwt_required()
+    @api.doc(security="Bearer")
     @api.expect(CLASS_CREATE_FLDS)
     @api.response(
         HTTPStatus.OK,
         "Success",
         api.model("All Classes", {MSG: fields.List(fields.Nested(CLASS_CREATE_FLDS), example=[_EXAMPLE_CLASS_1])})
     )
+    @api.response(HTTPStatus.UNAUTHORIZED, "Trainer JWT required", api.model("CreateClassUnauthorized", {MSG: fields.String()}))
+    @api.response(HTTPStatus.FORBIDDEN, "Only trainers can create classes", api.model("CreateClassForbidden", {MSG: fields.String()}))
     @api.response(HTTPStatus.BAD_REQUEST, "Bad Request", api.model("Error", {MSG: fields.String()}))
     def post(self):
+        """Create a new class. Requires a trainer JWT."""
+        claims = get_jwt()
+        if claims.get("role") != "trainer":
+            return {MSG: "Only trainers can create classes"}, HTTPStatus.FORBIDDEN
+
         assert isinstance(request.json, dict)
         data = request.json
 
@@ -138,5 +159,5 @@ class CreateClass(Resource):
             return {MSG: "Invalid value provided for one of the fields"}, HTTPStatus.NOT_ACCEPTABLE
 
         class_resource = ClassResource()
-        class_id = class_resource.create_class(name, start_time, end_time, description, room_number, capacity)
+        class_id = class_resource.create_class(name, trainer_name, start_time, end_time, description, room_number, capacity)
         return {MSG: f"Class created with id: {class_id}"}, HTTPStatus.OK
