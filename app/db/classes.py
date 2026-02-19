@@ -33,7 +33,7 @@ class ClassResource:
         class_doc = {
             CLASS_NAME: name,
             CLASS_DESCRIPTION: description,
-            TRAINER_NAME = trainer_name,
+            TRAINER_NAME: trainer_name,
             CLASS_START_TIME: start_time,
             CLASS_END_TIME: end_time,
             CLASS_ROOM_NUMBER: room_number,
