@@ -1,7 +1,7 @@
 # Requirements Elicitation and Analysis
 
 ## Client Meeting (Date/Time):
-We met with the client, Raania, on Thursday, Feb 12, 2026, from 2:00 PM to 2:30 PM.
+We met with the client, Rania, on Thursday, Feb 12, 2026, from 2:00 PM to 2:30 PM.
 
 ## Elicitation Techniques Used: 
 We used a semi-structured interview approach. Before the meeting, each team member prepared a set of planned questions for the four features (Create Class, View Class List, Book a Class, and View Member/Guest List). During the meeting, we asked follow-up questions whenever requirements were unclear or when the client introduced a new constraint. We also used our written feature descriptions and use-case prompts (e.g., “what happens when capacity is full?”) to guide the discussion and confirm edge cases.
@@ -174,30 +174,50 @@ Q: Does the list need download/export?
 
 **User case story: As a guest/member, I want to see a list of upcoming fitness classes so I can decide what to book.**
 
-**User case**
-
-**Use case name**
-Identifying available fitness classes for booking
+**Use case name: View all upcoming classes**
 
 **Preconditions**
 
-1. A guest should register on the site to become a member before booking and registering for a class
+1. The system has fitness classes stored in the database
+2. User can be a member or a guest to view classlists
 
 **Main success scenario**
 
-1. A member/user succesfully finds a list of available fitness classes
-2. A member succesfully sees a list of classes they are already enrolled in.
-3. A member/guest succesffuly sees class status which is open or full and closed
-4. The system successfully updates list if any classes are added, removed or closed.
+1. User navigates to class listings page 
+2. System retrieves all upcoming classes within the next week
+3. System shows classes by start time/earliest first
+4. System shows all classes in a list format with:
+  a) Class name, date, time, and location
+  b) Current capacity/status (Open/Closed)
+  c) Short description of the class and trainer name
+5. A member succesfully sees a list of classes they are already enrolled in.
+6. Guest/Member successfully sees the class lists
 
 **Alternative flows/Extensions**
 
-1. A member/user should come in person to the facility to check for availble classes if online checks fail.
+A1. Class lsitings page not accessible
+- A user should come in person to the facility to check for availble classes if online checks fail.
+A2. No upcoming classes available
+- The system shows nothing and the user sees a blank page
+A3. Connection to class informations fails
+- The user sees a blank page and need to refresh the page or try again later
+A4. The classes miss some information
+- The system shows classes as they are
+A5. Enrolled classes viewing 
+  a) A member with no previous class enrollment checks bookings
+  - The system verifies member's identity
+  - The memebr sees an empty page under enrolled classes
+  b) A guest tries to see enrolled classes
+  - The system checks guests identity
+  - The system prompts guest to log in first
+  - The guest is redirected to sign up/ log in page
 
 **Success guarantee/Postconditions**
 
-1. A member proceeds to book for a class of their choice that doesn't conflict with previous bookings.
-2. A user sign-ups to be able to book available classes of their choice
+1. User has an accurate view of all upcoming classes in the next week
+2. User can see class status either Open or Closed
+3. Members see their enrolled classes
+4. Guests access available classes before registering 
 
 ---
 
@@ -229,7 +249,7 @@ A1: Class is full
 
 - At step 4, if booked count is greater than or equal to the capacity, the system rejects the booking and informs the user the class is full.
   A2: User already booked
-- At step 4, if the user is already enrolled, the system rejects the booking and infroms the user they are already booked.
+- At step 4, if the user is already enrolled, the system rejects the booking and informs the user they are already booked.
   A3: User not found/ not identified
 - At step 3, if the user does not exist (or properly authenticated), the system rejects the request and informs the user.
   A4: Class not found
