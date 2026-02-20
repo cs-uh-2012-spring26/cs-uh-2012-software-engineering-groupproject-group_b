@@ -32,7 +32,7 @@ else
     PYTHON_CREATE = python
 endif
 
-run_local_server: dev_env tests
+run_local_server: dev_env
 	$(ACTIVATE) && FLASK_APP=app flask run --debug --host=0.0.0.0 --port 8000
 
 tests: pytests

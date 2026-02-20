@@ -1,5 +1,3 @@
-from app.apis.student import api as student_ns
-from app.apis.hello import api as hello_ns
 from app.apis.fitness_class import api as class_ns
 from app.apis.classlist import api as classlist_ns
 from app.apis.user import api as user_ns
@@ -21,9 +19,9 @@ def create_app():
     JWTManager(app)
 
     api = Api(
-        title="Students",
+        title="Fitness Management System API",
         version="1.0",
-        description="A simple student record keeping API",
+        description="API for creating and managing fitness classes, users, and class memberships",
         authorizations={
             "Bearer": {
                 "type": "apiKey",
@@ -35,8 +33,6 @@ def create_app():
     )
 
     api.init_app(app)
-    api.add_namespace(student_ns)
-    api.add_namespace(hello_ns)
     api.add_namespace(class_ns)
     api.add_namespace(user_ns)
     api.add_namespace(class_members_ns)
