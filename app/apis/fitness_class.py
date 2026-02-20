@@ -7,6 +7,7 @@ from flask_restx import Namespace, Resource, fields
 from app.apis import MSG
 from app.db.classes import (
     CLASS_CAPACITY,
+    CLASS_DATE,
     CLASS_DESCRIPTION,
     CLASS_END_TIME,
     CLASS_NAME,
@@ -81,6 +82,7 @@ _EXAMPLE_CLASS_1 = {
     CLASS_NAME: "Yoga",
     CLASS_DESCRIPTION: "Yoga class",
     TRAINER_NAME: "John",
+    CLASS_DATE: "2026-03-01",
     CLASS_START_TIME: "10:00",
     CLASS_END_TIME: "11:00",
     CLASS_ROOM_NUMBER: "101",
@@ -92,9 +94,10 @@ CLASS_CREATE_FLDS = api.model(
     {
         CLASS_NAME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_NAME], required=True),
         CLASS_DESCRIPTION: fields.String(example=_EXAMPLE_CLASS_1[CLASS_DESCRIPTION], required=True),
-        TRAINER_NAME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_DESCRIPTION], required=True),
-        CLASS_START_TIME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_START_TIME], required=True),
-        CLASS_END_TIME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_END_TIME], required=True),
+        TRAINER_NAME: fields.String(example=_EXAMPLE_CLASS_1[TRAINER_NAME], required=True),
+        CLASS_DATE: fields.String(example=_EXAMPLE_CLASS_1[CLASS_DATE], required=True, description="Date of the class (YYYY-MM-DD), must be today or in the future"),
+        CLASS_START_TIME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_START_TIME], required=True, description="Start time (HH:MM)"),
+        CLASS_END_TIME: fields.String(example=_EXAMPLE_CLASS_1[CLASS_END_TIME], required=True, description="End time (HH:MM)"),
         CLASS_ROOM_NUMBER: fields.String(example=_EXAMPLE_CLASS_1[CLASS_ROOM_NUMBER], required=True),
         CLASS_CAPACITY: fields.Integer(example=_EXAMPLE_CLASS_1[CLASS_CAPACITY], required=True),
     },
@@ -129,19 +132,44 @@ class CreateClass(Resource):
         name = data.get(CLASS_NAME)
         description = data.get(CLASS_DESCRIPTION)
         trainer_name = data.get(TRAINER_NAME)
+        date_str = data.get(CLASS_DATE)
         start_time = data.get(CLASS_START_TIME)
         end_time = data.get(CLASS_END_TIME)
         room_number = data.get(CLASS_ROOM_NUMBER)
 
+        if not (
+            isinstance(name, str) and len(name) > 0
+            and isinstance(description, str) and len(description) > 0
+            and isinstance(room_number, str)
+        ):
+            return {MSG: "Invalid value provided for one of the fields"}, HTTPStatus.NOT_ACCEPTABLE
+
         # Validate time format and that start_time is before end_time
         try:
-            start_dt = datetime.strptime(start_time, "%H:%M")
-            end_dt = datetime.strptime(end_time, "%H:%M")
+            start_t = datetime.strptime(start_time, "%H:%M").time()
+            end_t = datetime.strptime(end_time, "%H:%M").time()
         except (TypeError, ValueError):
             return {MSG: "Invalid time format, expected HH:MM"}, HTTPStatus.NOT_ACCEPTABLE
 
-        if start_dt >= end_dt:
+        if start_t >= end_t:
             return {MSG: "Start time must be before end time"}, HTTPStatus.NOT_ACCEPTABLE
+
+        # Validate date format and that the class is not in the past
+        try:
+            date_input = datetime.strptime(date_str, "%Y-%m-%d").date()
+        except (TypeError, ValueError):
+            return {MSG: "Invalid date format, expected YYYY-MM-DD"}, HTTPStatus.NOT_ACCEPTABLE
+
+        now = datetime.now()
+        if date_input < now.date():
+            return {MSG: "Date must be today or in the future"}, HTTPStatus.NOT_ACCEPTABLE
+
+        if date_input == now.date() and start_t <= now.time():
+            return {MSG: "Start time must be in the future for today's classes"}, HTTPStatus.NOT_ACCEPTABLE
+
+        # Combine date + time into full datetime objects for storage
+        start_dt = datetime.combine(date_input, start_t)
+        end_dt = datetime.combine(date_input, end_t)
 
         # Validate capacity type
         try:
@@ -149,15 +177,6 @@ class CreateClass(Resource):
         except (TypeError, ValueError):
             return {MSG: "Invalid value provided for capacity, must be an integer"}, HTTPStatus.NOT_ACCEPTABLE
 
-        if not (
-            isinstance(name, str) and len(name) > 0
-            and isinstance(description, str) and len(description) > 0
-            and isinstance(start_time, str)
-            and isinstance(end_time, str)
-            and isinstance(room_number, str)
-        ):
-            return {MSG: "Invalid value provided for one of the fields"}, HTTPStatus.NOT_ACCEPTABLE
-
         class_resource = ClassResource()
-        class_id = class_resource.create_class(name, trainer_name, start_time, end_time, description, room_number, capacity)
+        class_id = class_resource.create_class(name, trainer_name, start_dt, end_dt, description, room_number, capacity)
         return {MSG: f"Class created with id: {class_id}"}, HTTPStatus.OK

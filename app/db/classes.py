@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from app.db.utils import serialize_item, serialize_items
 from app.db import DB
 from bson import ObjectId
@@ -7,6 +9,7 @@ from bson import ObjectId
 CLASS_COLLECTION = "classes"
 CLASS_NAME = "name"
 TRAINER_NAME = "trainer_name"
+CLASS_DATE = "date"
 CLASS_START_TIME = "start_time"
 CLASS_END_TIME = "end_time"
 CLASS_DESCRIPTION = "description"
@@ -22,9 +25,9 @@ class ClassResource:
     def create_class(
         self,
         name: str,
-        trainer_name:str,
-        start_time: str,
-        end_time: str,
+        trainer_name: str,
+        start_time: datetime,
+        end_time: datetime,
         description: str,
         room_number: str,
         capacity: int,
