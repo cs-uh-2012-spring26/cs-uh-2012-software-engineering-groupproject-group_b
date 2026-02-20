@@ -114,10 +114,87 @@ class ClassList(Resource):
             })
 
         return result
+
+
+@api.route("/member/enrolled")
+# The resource handler for the class list endpoint. this class handles GET requests for fetching up
+# upcoming classes
+class EnrolledClasses(Resource):
+    @jwt_required()
+    @api.marshal_list_with(CLASS_MODEL)
+    # Possible resposne in Swagger
+    @api.response(HTTPStatus.OK, "Success-Your enroled classes returned")
+    @api.response(HTTPStatus.UNAUTHORIZED, "Missing or Invalid JWT token")
+    @api.response(HTTPStatus.BAD_REQUEST, "Invalid user ID format")
+    def get(self):
+
+        # Get list of all fitness classes the current user is currently enrolled in. return all fitness classes regardless of their status
+        # Only retunrs upcoming classes and helps members see which classes they are already enrolled in
+        # Classes are sorted by their start time
+
+        # Get current user's id form the JWT token
+        current_user_id = get_jwt_identity()
+
+        if not current_user_id:
+            return {"MSG": "User not found"}, HTTPStatus.UNAUTHORIZED
+
+        try:
+            # convert string id to ObjectID for databse query
+
+            member_oid = ObjectId(current_user_id)
+
+        except Exception:
+            return {"MSG": "Invalid user ID format"}, HTTPStatus.BAD_REQUEST
+
+        # Find all classes this member is among the users and the class is among upcoming classes
+
+        classes = DB.get_collection("classes")
+        # if collection doesn't exist, return empty collection
+        if classes is None:
+            return []
+
+        now = datetime.now()  # get current time to filter for upcoming classes
+
+        enrolled = self.correction.find({
+            "user_ids": member_oid,  # check if memebr id is among user ids
+
+            "start_time": {"$gte": now}  # only upcoming classes
+        }).sort("start_time", 1)  # start woth the earliest class
+
+        # transform each class to match class model
+
+        result = []
+        for c in enrolled:
+            # Calculate class status based on bookings and capacity
+
+            booked = len(c.get("user_ids", []))
+            capacity = c.get("capacity", 0)
+
+            # response for class list
+
+            class_data = {
+
+                "Class_name": c.get("name", ""),
+                "Trainer_name": c.get("trainer_name", ""),
+                "Class_start_Time": str(c.get("start_time", "")),
+                "Class_end_time": str(c.get("end_time", "")),
+                "Class_description": c.get("description", ""),
+                "Class_room_number": c.get("room_number", ""),
+                "Class_capacity": capacity,
+                "Class_status": "Closed" if booked >= capacity else "Open"
+            }
+
+            result.append(class_data)
+
+        return result
+
+
 # BOOK CLASS FEATURE (FOR MEMBER)
 _UNAUTHORIZED_RESPONSE = api.model(
-    "BookClassUnauthorized", {MSG: fields.String(example="Missing or invalid token")}
+    "BookClassUnauthorized", {MSG: fields.String(
+        example="Missing or invalid token")}
 )
+
 
 @api.route("/<class_id>/book")
 @api.param("class_id", "Class id to book")
@@ -128,7 +205,8 @@ class ClassBooking(Resource):
     @api.response(
         HTTPStatus.OK,
         "Booked",
-        api.model("BookClassOK", {MSG: fields.String(example="Booked successfully")}),
+        api.model("BookClassOK", {MSG: fields.String(
+            example="Booked successfully")}),
     )
     @api.response(
         HTTPStatus.UNAUTHORIZED,
@@ -138,12 +216,14 @@ class ClassBooking(Resource):
     @api.response(
         HTTPStatus.NOT_FOUND,
         "Not Found",
-        api.model("BookClassNotFound", {MSG: fields.String(example="Class not found")}),
+        api.model("BookClassNotFound", {
+                  MSG: fields.String(example="Class not found")}),
     )
     @api.response(
         HTTPStatus.CONFLICT,
         "Conflict",
-        api.model("BookClassConflict", {MSG: fields.String(example="Class is full / already booked")}),
+        api.model("BookClassConflict", {MSG: fields.String(
+            example="Class is full / already booked")}),
     )
     def post(self, class_id):
         """Book a class. Requires a valid member JWT (Bearer token)."""
