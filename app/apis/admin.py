@@ -19,62 +19,8 @@ from app.db.classes import (
 from app.db.users import UserResource
 from http import HTTPStatus
 
-api = Namespace("classes", description="Endpoint for classes")
+api = Namespace("admin", description="Endpoints for admin")
 
-_UNAUTHORIZED_RESPONSE = api.model(
-    "BookClassUnauthorized", {MSG: fields.String(example="Missing or invalid token")}
-)
-
-@api.route("/<class_id>/book")
-@api.param("class_id", "Class id to book")
-class ClassBooking(Resource):
-
-    @jwt_required()
-    @api.doc(security="Bearer")
-    @api.response(
-        HTTPStatus.OK,
-        "Booked",
-        api.model("BookClassOK", {MSG: fields.String(example="Booked successfully")}),
-    )
-    @api.response(
-        HTTPStatus.UNAUTHORIZED,
-        "Unauthorized — valid JWT required",
-        _UNAUTHORIZED_RESPONSE,
-    )
-    @api.response(
-        HTTPStatus.NOT_FOUND,
-        "Not Found",
-        api.model("BookClassNotFound", {MSG: fields.String(example="Class not found")}),
-    )
-    @api.response(
-        HTTPStatus.CONFLICT,
-        "Conflict",
-        api.model("BookClassConflict", {MSG: fields.String(example="Class is full / already booked")}),
-    )
-    def post(self, class_id):
-        """Book a class. Requires a valid member JWT (Bearer token)."""
-        user_id = get_jwt_identity()
-
-        user_resource = UserResource()
-        user = user_resource.get_user_by_id(user_id)
-        if user is None:
-            return {MSG: "User not found"}, HTTPStatus.NOT_FOUND
-
-        class_resource = ClassResource()
-        status = class_resource.add_user_to_class(class_id, user_id)
-
-        if status == "CLASS_NOT_FOUND":
-            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
-        if status == "ALREADY_BOOKED":
-            return {MSG: "User already booked this class"}, HTTPStatus.CONFLICT
-        if status == "CLASS_FULL":
-            return {MSG: "Class is full"}, HTTPStatus.CONFLICT
-
-        ok = user_resource.add_class_to_user(user_id, class_id)
-        if not ok:
-            return {MSG: "User not found"}, HTTPStatus.NOT_FOUND
-
-        return {MSG: "Booked successfully"}, HTTPStatus.OK
 
 #CREATE CLASS ENDPOINT
 
@@ -180,3 +126,65 @@ class CreateClass(Resource):
         class_resource = ClassResource()
         class_id = class_resource.create_class(name, trainer_name, start_dt, end_dt, description, room_number, capacity)
         return {MSG: f"Class created with id: {class_id}"}, HTTPStatus.OK
+
+
+# VIEW LIST OF ENROLLED MEMBERS (FOR ADMIN)
+
+
+# Model for a single booked member entry returned in the response
+MEMBER_MODEL = api.model(
+    "BookedMember",
+    {
+        "name": fields.String(description="Member's full name"),
+        "email": fields.String(description="Member's email address"),
+        "contact": fields.String(description="Member's contact number"),
+    },
+)
+
+
+@api.route("/<class_id>/members")
+@api.param("class_id", "The ID of the class")
+class ClassMemberList(Resource):
+
+    @jwt_required()
+    @api.doc(security="Bearer")
+    @api.marshal_list_with(MEMBER_MODEL)
+    @api.response(HTTPStatus.OK, "List of booked members returned")
+    @api.response(HTTPStatus.UNAUTHORIZED, "Missing or invalid JWT token", api.model("MembersUnauthorized", {MSG: fields.String()}))
+    @api.response(HTTPStatus.FORBIDDEN, "Access restricted to trainers and admins", api.model("MembersForbidden", {MSG: fields.String()}))
+    @api.response(HTTPStatus.NOT_FOUND, "Class not found", api.model("MembersNotFound", {MSG: fields.String()}))
+    def get(self, class_id):
+        """View the list of members who booked a spot in a class (trainer/admin only)"""
+
+        # Check that the requester's role is trainer or admin (A2: Insufficient role)
+        claims = get_jwt()
+        role = claims.get("role", "")
+        if role not in ("trainer", "admin"):
+            return {MSG: "Access restricted to trainers and admins"}, HTTPStatus.FORBIDDEN
+
+        # Look up the class by its ID (A3: Class not found)
+        class_resource = ClassResource()
+        fitness_class = class_resource.get_class_by_id(class_id, str)
+        if fitness_class is None:
+            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
+
+        # Get the list of ObjectIds of users who booked this class
+        user_oids = fitness_class.get("user_ids", [])
+
+        # A4: Class has no bookings — return empty list with 200 OK
+        if not user_oids:
+            return []
+
+        # Fetch full details for each booked user
+        user_resource = UserResource()
+        members = user_resource.get_users_by_ids(user_oids)
+
+        # Return only name, email, and contact for each member
+        return [
+            {
+                "name": m.get("name", ""),
+                "email": m.get("email", ""),
+                "contact": m.get("contact", ""),
+            }
+            for m in members
+        ]

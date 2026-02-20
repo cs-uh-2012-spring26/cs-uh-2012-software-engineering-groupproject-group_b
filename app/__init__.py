@@ -1,7 +1,6 @@
-from app.apis.fitness_class import api as class_ns
-from app.apis.classlist import api as classlist_ns
 from app.apis.user import api as user_ns
-from app.apis.class_members import api as class_members_ns
+from app.apis.admin import api as admin_ns
+from app.apis.member import api as member_ns
 from app.config import Config
 from app.db import DB
 
@@ -33,10 +32,9 @@ def create_app():
     )
 
     api.init_app(app)
-    api.add_namespace(class_ns)
     api.add_namespace(user_ns)
-    api.add_namespace(class_members_ns)
-    api.add_namespace(classlist_ns)
+    api.add_namespace(admin_ns)
+    api.add_namespace(member_ns)
 
     @api.errorhandler(Exception)
     def handle_input_validation_error(error):
