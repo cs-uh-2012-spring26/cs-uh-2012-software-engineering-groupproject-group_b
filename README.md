@@ -1,87 +1,142 @@
-# Students Records API
+# Fitness Management System API
 
-This repo provides a template for setting up a flask rest API server. As a starting point, it shows an example of a simple hello world endpoint as well as endpoints that offer interactions with student records.
+A REST API for creating and managing fitness classes, users, and class bookings. Built with Flask-RESTX and MongoDB.
 
 ## Prerequisites
 
-- python 3.10 or higher
-- MongoDB installed. Follow [https://www.mongodb.com/docs/manual/installation/](https://www.mongodb.com/docs/manual/installation/)
-to install MongoDB locally. Select the right link for your operating system.
+- Python 3.10 or higher
+- MongoDB installed and running. Follow [https://www.mongodb.com/docs/manual/installation/](https://www.mongodb.com/docs/manual/installation/) to install MongoDB locally.
 
 ## Tech Stack
 
-This flask web app uses:
-
-- [Flask-RESTX][flask-restx] for creating REST APIs. Directory structure
-follows [flask restx instructions on scaling your project][flask-restx-scaling]
-  - flask-restx automatically generates
-  [OpenAPI specifications][openapi-specification] for your API
-- [PyMongo][pymongo] for communicating with the mongodb database
-- [pytest][pytest] for testing
-(see [flask specific testing instructions on pytest][pytest-flask]
-for more info specific to testing Flask applications)
-- [mongomock][mongomock] for mocking the mongodb during unit testing
-
-[flask-restx]: https://flask-restx.readthedocs.io/en/latest/quickstart.html
-[flask-restx-scaling]: https://flask-restx.readthedocs.io/en/latest/scaling.html
-[openapi-specification]: https://swagger.io/docs/specification/v3_0/about/
-[pymongo]: https://pymongo.readthedocs.io/en/stable/
-[pytest]: https://docs.pytest.org/en/stable/
-[pytest-flask]: https://flask.palletsprojects.com/en/stable/testing/
-[mongomock]: https://docs.mongoengine.org/guide/mongomock.html
+- [Flask-RESTX](https://flask-restx.readthedocs.io/en/latest/quickstart.html) — REST API framework with automatic [OpenAPI/Swagger](https://swagger.io/docs/specification/v3_0/about/) generation
+- [PyMongo](https://pymongo.readthedocs.io/en/stable/) — MongoDB driver
+- [Flask-JWT-Extended](https://flask-jwt-extended.readthedocs.io/) — JWT authentication
+- [pytest](https://docs.pytest.org/en/stable/) for testing (see [Flask testing docs](https://flask.palletsprojects.com/en/stable/testing/))
+- [mongomock](https://docs.mongoengine.org/guide/mongomock.html) — MongoDB mock for unit tests
 
 ## Running Locally
 
-This assumes you are already running MongoDB (e.g., through
-`brew services restart mongodb-community` on MacOS or
-`sudo systemctl restart mongod` on Linux.
-Find the equivalent for your OS)
+### 1. Start MongoDB
 
-### Setting up the environment
+Make sure MongoDB is running before starting the server:
 
-1. Check `.samplenv` file and follow the instructions there to create
-your `.env` file
-2. Run `make dev_env` to create a virtual environment and install dependencies
+- **macOS:** `brew services restart mongodb-community`
+- **Linux:** `sudo systemctl restart mongod`
 
-### Running the server
+### 2. Set up the `.env` file
 
-1. Run `make run_local_server` to run the server. This will also run the tests first.
-2. Go to [http://127.0.0.1:8000](http://127.0.0.1:8000) to see it running!
+Create a `.env` file in the project root with the following variables:
 
-You can use `ctrl-c` to stop the server.
+```env
+MONGO_URI="mongodb://localhost:27017"
+DB_NAME="eventsref_dev"
+MOCK_DB="false"
+DEBUG="true"
+JWT_SECRET_KEY="your-secret-key-here"
+```
 
-### Testing the API server
+> **Note:** Set `JWT_SECRET_KEY` to any long random string. Keep it secret — it signs all JWT tokens.
 
-Run `make tests` to execute the test suite and see the coverage report
-in your terminal. You can also see a visual report by viewing
-[/htmlcov/index.html](/htmlcov/index.html) in your browser.
+### 3. Create the virtual environment and install dependencies
 
-### Manually activating and deactivating the virtual environment
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+```
 
-Manually activating and deactivating the virtual environment is useful for
-debugging issues and running specific scripts with flexibility (e.g., you can
-run `FLASK_APP=app flask run --debug --host=0.0.0.0 --port 8000`
-inside the virtual environment to directly start
-the server without running tests first).
+### 4. Run the server
 
-To activate the virtual environment manually:
+```sh
+FLASK_APP=app flask run --debug --host=0.0.0.0 --port 8000
+```
+
+The server will be available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+
+Use `ctrl-c` to stop the server.
+
+### 5. Run the tests
+
+```sh
+pytest --cov=app tests/
+```
+
+---
+
+## Using the Swagger UI
+
+Once the server is running, open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser to access the interactive Swagger UI.
+
+### Authenticating in Swagger
+
+Most endpoints require a JWT token. Here's how to authenticate:
+
+1. **Register an account** — use `POST /users/register` (member) or `POST /users/trainer/register` (trainer)
+2. **Log in** — use `POST /users/login` (member) or `POST /users/trainer/login` (trainer)
+3. **Copy the `access_token`** from the login response
+4. **Click the "Authorize" button** at the top of the Swagger page
+5. In the "Bearer" field, enter: `Bearer <your_token>` (include the word `Bearer` followed by a space, then the token)
+6. Click **Authorize** then **Close** — all subsequent requests will include your token
+
+---
+
+## API Endpoints
+
+### Users (`/users`)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/users/register` | None | Register a new member account |
+| POST | `/users/login` | None | Log in as a member, returns JWT |
+| POST | `/users/trainer/register` | None | Register a new trainer account |
+| POST | `/users/trainer/login` | None | Log in as a trainer, returns JWT |
+
+**Password policy:** 10–128 characters, must include at least one uppercase letter, one lowercase letter, one digit, and one special character. No spaces allowed.
+
+---
+
+### Member (`/member`)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/member` | None | View all upcoming fitness classes |
+| POST | `/member/<class_id>/book` | Member JWT | Book a spot in a class |
+
+---
+
+### Admin (`/admin`)
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| POST | `/admin/` | Trainer JWT | Create a new fitness class |
+| GET | `/admin/<class_id>/members` | Trainer JWT | View all members booked in a class |
+
+**Class fields when creating:**
+- `class_name`, `class_description`, `trainer_name` — strings
+- `class_date` — date in `YYYY-MM-DD` format (must be today or future)
+- `class_start_time`, `class_end_time` — time in `HH:MM` format (24-hour)
+- `class_room_number` — string
+- `class_capacity` — integer
+
+---
+
+## Manually Managing the Virtual Environment
+
+To activate:
 
 ```sh
 source .venv/bin/activate
 ```
 
-Alternatively, you can use:
-
-```sh
-. .venv/bin/activate
-```
-
-To deactivate the virtual environment:
+To deactivate:
 
 ```sh
 deactivate
 ```
 
-## Best Practices
+---
 
-See [/docs/BestPractices.md](/docs/BestPractices.md) for advice regarding branch naming and other useful tips.
+## Additional Docs
+
+See [/docs/BestPractices.md](/docs/BestPractices.md) for branch naming conventions and other development tips.
