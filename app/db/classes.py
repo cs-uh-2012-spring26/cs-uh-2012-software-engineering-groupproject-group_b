@@ -17,6 +17,7 @@ CLASS_ROOM_NUMBER = "room_number"
 CLASS_CAPACITY = "capacity"
 
 CLASS_USER_IDS = "user_ids"
+CLASS_TRAINER_ID = "trainer_id"
 
 class ClassResource:
     def __init__(self):
@@ -31,12 +32,14 @@ class ClassResource:
         description: str,
         room_number: str,
         capacity: int,
+        trainer_id: str | None = None,
         user_ids: list[str] | None = None,
     ):
         class_doc = {
             CLASS_NAME: name,
             CLASS_DESCRIPTION: description,
             TRAINER_NAME: trainer_name,
+            CLASS_TRAINER_ID: trainer_id,
             CLASS_START_TIME: start_time,
             CLASS_END_TIME: end_time,
             CLASS_ROOM_NUMBER: room_number,
