@@ -103,14 +103,36 @@ Q: What happens when capacity is full?
 Q: Who can view booked users?
 
  → Trainer/Admin
- 
+
 Q: What information should be visible?
 
  → Name, email, contact
- 
+
 Q: Does the list need download/export?
 
  → Viewing only is sufficient
+
+**Feature 5 - Send Reminder Emails**
+
+Q: Is reminder sending automated or manually triggered by the trainer?
+
+ → No automation is needed. The trainer/admin manually triggers the reminder at any time they choose.
+
+Q: Who receives the reminder when it is sent?
+
+ → All members currently enrolled in the class at the time the trainer triggers the reminder.
+
+Q: What information must the reminder email include?
+
+ → All class information: name, description, trainer name, date, start time, end time, and room number.
+
+Q: Can the trainer send multiple reminders for the same class, or toggle reminders on/off per class?
+
+ → There is no per-class toggle. The trainer can trigger the reminder endpoint as many times as needed.
+
+Q: Is retry logic or admin notification required when an email fails to deliver?
+
+ → No. The system should report which emails succeeded and which failed in the response, but no automated retry or notification is required.
 
 # Use Case Diagram
 
@@ -309,3 +331,61 @@ A4: Class has no bookings
 2. Each entry in the list contains the member's name, email address, and contact number.
 3. No user data is modified as a result of this request.
 4. Only authenticated trainers and admins can access this information; members and unauthenticated users cannot.
+
+---
+
+## Feature 5: Send Reminder Emails
+
+**User story: As a fitness trainer, I want to send reminder emails to those who signed up for a class before it takes place.**
+
+**Use Case Name:** Send Reminder Emails to Enrolled Class Members
+
+**Preconditions**
+
+1. The trainer is authenticated with a valid JWT token.
+2. The trainer's account has the role of "trainer".
+3. The fitness class exists in the system and has a valid class ID.
+4. The logged-in trainer is the trainer assigned to the class.
+
+**Main Success Scenario**
+
+1. The trainer sends a POST request to the reminder endpoint, providing the class ID and their JWT token.
+2. The system validates the JWT token and confirms the requester's role is "trainer".
+3. The system verifies the logged-in trainer is the one assigned to the specified class.
+4. The system looks up the class by the provided class ID and confirms it exists.
+5. The system retrieves the list of all members currently enrolled in the class.
+6. For each enrolled member, the system sends a reminder email via Amazon SES containing all class details: name, description, trainer name, date, start time, end time, and room number.
+7. The system returns a summary response indicating how many emails were sent successfully and listing any failures.
+
+**Alternative Flows/Extensions**
+
+A1: Missing or invalid JWT token
+
+- At step 2, if no token is provided or the token is invalid/expired, the system rejects the request with a 401 Unauthorized response.
+
+A2: Insufficient role
+
+- At step 2, if the requester's role is not "trainer", the system rejects the request with a 403 Forbidden response.
+
+A3: Trainer not assigned to this class
+
+- At step 3, if the logged-in trainer is not the trainer assigned to the class, the system rejects the request with a 403 Forbidden response.
+
+A4: Class not found
+
+- At step 4, if the provided class ID does not match any class in the system, the system rejects the request with a 404 Not Found response.
+
+A5: No members enrolled
+
+- At step 5, if the class has no enrolled members, the system returns a 200 OK response with an empty sent list and an appropriate message.
+
+A6: Some emails fail to send
+
+- At step 6, if one or more emails are rejected by SES, those failures are recorded. The system continues sending to all remaining members and includes both successes and failures in the final response.
+
+**Success Guarantee / Postconditions**
+
+1. A reminder email containing all class details is sent to every enrolled member.
+2. The system returns a summary of successfully delivered emails and any failures.
+3. No class or user data is modified as a result of this request.
+4. Only the trainer assigned to the class can trigger reminder emails for that class.
