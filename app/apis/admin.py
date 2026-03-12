@@ -13,10 +13,12 @@ from app.db.classes import (
     CLASS_NAME,
     CLASS_ROOM_NUMBER,
     CLASS_START_TIME,
+    CLASS_TRAINER_ID,
     TRAINER_NAME,
     ClassResource,
 )
 from app.db.users import UserResource
+from app.email import send_class_reminder
 from http import HTTPStatus
 
 api = Namespace("admin", description="Endpoints for admin")
@@ -124,7 +126,8 @@ class CreateClass(Resource):
             return {MSG: "Invalid value provided for capacity, must be an integer"}, HTTPStatus.NOT_ACCEPTABLE
 
         class_resource = ClassResource()
-        class_id = class_resource.create_class(name, trainer_name, start_dt, end_dt, description, room_number, capacity)
+        trainer_id = get_jwt_identity()
+        class_id = class_resource.create_class(name, trainer_name, start_dt, end_dt, description, room_number, capacity, trainer_id=trainer_id)
         return {MSG: f"Class created with id: {class_id}"}, HTTPStatus.OK
 
 
@@ -188,3 +191,87 @@ class ClassMemberList(Resource):
             }
             for m in members
         ]
+
+
+# SEND REMINDER EMAILS (FOR TRAINER)
+
+_FAILED_EMAIL_MODEL = api.model(
+    "FailedEmail",
+    {
+        "email": fields.String(description="Recipient email address"),
+        "error": fields.String(description="SES error message"),
+    },
+)
+
+REMINDER_RESPONSE_MODEL = api.model(
+    "ReminderResponse",
+    {
+        MSG: fields.String(description="Summary of reminder sending"),
+        "sent_to": fields.List(fields.String(), description="Emails successfully sent"),
+        "failed": fields.List(fields.Nested(_FAILED_EMAIL_MODEL), description="Emails that failed"),
+    },
+)
+
+
+@api.route("/<class_id>/remind")
+@api.param("class_id", "The ID of the class")
+class SendClassReminder(Resource):
+
+    @jwt_required()
+    @api.doc(security="Bearer")
+    @api.response(HTTPStatus.OK, "Reminder emails processed", REMINDER_RESPONSE_MODEL)
+    @api.response(HTTPStatus.UNAUTHORIZED, "Missing or invalid JWT token", api.model("RemindUnauthorized", {MSG: fields.String()}))
+    @api.response(HTTPStatus.FORBIDDEN, "Only the class trainer can send reminders", api.model("RemindForbidden", {MSG: fields.String()}))
+    @api.response(HTTPStatus.NOT_FOUND, "Class not found", api.model("RemindNotFound", {MSG: fields.String()}))
+    def post(self, class_id):
+        """Send reminder emails to all members enrolled in a class (trainer only).
+
+        The logged-in trainer must be the trainer assigned to the class.
+        In SES sandbox mode, each recipient email must be individually verified
+        in the AWS SES console before emails can be delivered.
+        """
+        claims = get_jwt()
+        if claims.get("role") != "trainer":
+            return {MSG: "Only trainers can send reminder emails"}, HTTPStatus.FORBIDDEN
+
+        # Look up the class
+        class_resource = ClassResource()
+        fitness_class = class_resource.get_class_by_id(class_id, str)
+        if fitness_class is None:
+            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
+
+        # Verify the logged-in trainer is the one assigned to this class
+        trainer_identity = get_jwt_identity()
+        if fitness_class.get(CLASS_TRAINER_ID) != trainer_identity:
+            return {MSG: "You are not the trainer assigned to this class"}, HTTPStatus.FORBIDDEN
+
+        user_resource = UserResource()
+
+        # Get enrolled members
+        user_oids = fitness_class.get("user_ids", [])
+        if not user_oids:
+            return {MSG: "No members enrolled in this class", "sent_to": [], "failed": []}, HTTPStatus.OK
+
+        members = user_resource.get_users_by_ids(user_oids)
+
+        # Send a reminder email to each member
+        successes = []
+        failures = []
+        for member in members:
+            email = member.get("email", "")
+            name = member.get("name", "")
+            ok, err = send_class_reminder(
+                member_email=email,
+                member_name=name,
+                class_info=fitness_class,
+            )
+            if ok:
+                successes.append(email)
+            else:
+                failures.append({"email": email, "error": err})
+
+        return {
+            MSG: f"Reminders processed: {len(successes)} sent, {len(failures)} failed",
+            "sent_to": successes,
+            "failed": failures,
+        }, HTTPStatus.OK
