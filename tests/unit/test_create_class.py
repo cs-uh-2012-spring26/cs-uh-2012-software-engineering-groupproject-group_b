@@ -44,6 +44,8 @@ def payload(**overrides):
 
 def test_create_class_success(client, mocker):
     mock_jwt(mocker, role="trainer")
+    # mock trainer id get_jwt_identity
+    mocker.patch("app.apis.admin.get_jwt_identity", return_value="23")
 
     mocked_class_resource = mocker.patch("app.apis.admin.ClassResource")
     mocked_instance = mocked_class_resource.return_value
