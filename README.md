@@ -1,3 +1,5 @@
+![CI](https://github.com/cs-uh-2012/cs-uh-2012-software-engineering-groupproject-group-b/actions/workflows/ci.yml/badge.svg)
+
 # Fitness Management System API
 
 A REST API for creating and managing fitness classes, users, and class bookings. Built with Flask-RESTX and MongoDB.
