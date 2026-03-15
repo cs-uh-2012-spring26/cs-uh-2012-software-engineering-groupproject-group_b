@@ -148,14 +148,14 @@ class EnrolledClasses(Resource):
 
         # Find all classes this member is among the users and the class is among upcoming classes
 
-        classes = DB.get_collection("classes")
+        classes_collection = DB.get_collection("classes")
         # if collection doesn't exist, return empty collection
-        if classes is None:
+        if classes_collection is None:
             return []
 
         now = datetime.now()  # get current time to filter for upcoming classes
 
-        enrolled = self.correction.find({
+        enrolled = classes_collection.find({
             "user_ids": member_oid,  # check if memebr id is among user ids
 
             "start_time": {"$gte": now}  # only upcoming classes
@@ -176,7 +176,8 @@ class EnrolledClasses(Resource):
 
                 "Class_name": c.get("name", ""),
                 "Trainer_name": c.get("trainer_name", ""),
-                "Class_start_Time": str(c.get("start_time", "")),
+                "Class_date": c.get("start_time").strftime("%Y-%m-%d") if c.get("start_time") else "",
+                "Class_start_time": str(c.get("start_time", "")),
                 "Class_end_time": str(c.get("end_time", "")),
                 "Class_description": c.get("description", ""),
                 "Class_room_number": c.get("room_number", ""),
