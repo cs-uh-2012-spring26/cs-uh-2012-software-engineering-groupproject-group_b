@@ -1,4 +1,4 @@
-![CI](https://github.com/cs-uh-2012/cs-uh-2012-software-engineering-groupproject-group_b/actions/workflows/CI.yaml/badge.svg)
+![CI](https://github.com/cs-uh-2012-spring26/cs-uh-2012-software-engineering-groupproject-group_b/actions/workflows/CI.yaml/badge.svg)
 
 # Fitness Management System API
 
