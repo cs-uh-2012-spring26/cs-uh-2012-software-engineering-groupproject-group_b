@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 
 def get_required_environ(name: str) -> str:
-    load_dotenv()
+    load_dotenv(override=True)
     try:
         value = environ[name]
     except KeyError as e:
