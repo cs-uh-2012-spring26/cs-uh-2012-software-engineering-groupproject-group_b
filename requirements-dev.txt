@@ -7,3 +7,6 @@ mongomock==4.3.0
 coverage==7.9.1
 mypy==1.17.0
 Faker==37.5.3
+pytest-mock==3.14.0
+pytest-mock
+jsonschema
