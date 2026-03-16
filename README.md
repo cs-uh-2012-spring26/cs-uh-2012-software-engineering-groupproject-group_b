@@ -35,10 +35,30 @@ MONGO_URI="mongodb://localhost:27017"
 DB_NAME="eventsref_dev"
 MOCK_DB="false"
 DEBUG="true"
-JWT_SECRET_KEY="your-secret-key-here"
+JWT_SECRET_KEY="change-me-to-a-long-random-secret"
+AWS_ACCESS_KEY_ID="your-obtained-access-key"
+AWS_SECRET_ACCESS_KEY="your-obtained-secret-key"
+AWS_SES_REGION="eu-central-1"
+SES_SENDER_EMAIL="your-sender-email"
 ```
 
 > **Note:** Set `JWT_SECRET_KEY` to any long random string. Keep it secret — it signs all JWT tokens.
+
+### 2.1 Amazon SES setup for reminder emails (Feature 5)
+
+To run and test the reminder email feature, configure Amazon SES and IAM, then fill the SES-related values in `.env`.
+
+1. Create an AWS account at [https://aws.amazon.com/ses/](https://aws.amazon.com/ses/).
+2. In Amazon SES, verify all sender and receiver email addresses you plan to use for testing.
+3. Because this project uses SES in **Sandbox mode** (and no domain is configured), **only verified email addresses can send or receive emails**.
+4. Ensure the trainer user email and all member user emails used in tests are verified in SES.
+5. Choose the sending email address from your verified identities and set it as `SES_SENDER_EMAIL` in `.env`.
+6. Choose the SES region where your verified identity exists and set it as `AWS_SES_REGION` in `.env`.
+7. Go to AWS IAM, create a new user with a meaningful name, and attach the `AmazonSESFullAccess` policy.
+8. For that IAM user, open **Security credentials** and create an access key.
+9. Copy those credentials into `.env` as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+
+> **Reminder:** If emails fail in sandbox mode, the most common reason is that either the sender or one of the recipient addresses is not verified in SES.
 
 ### 3. Create the virtual environment and install dependencies
 
@@ -113,6 +133,7 @@ Most endpoints require a JWT token. Here's how to authenticate:
 |--------|----------|------|-------------|
 | POST | `/admin/` | Trainer JWT | Create a new fitness class |
 | GET | `/admin/<class_id>/members` | Trainer JWT | View all members booked in a class |
+| POST | `/admin/<class_id>/remind` | Trainer JWT | Send reminder emails to all enrolled members in the class (only the assigned trainer can send) |
 
 **Class fields when creating:**
 - `class_name`, `class_description`, `trainer_name` — strings
