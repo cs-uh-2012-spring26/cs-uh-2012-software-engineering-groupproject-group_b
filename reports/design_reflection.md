@@ -122,6 +122,120 @@ sequenceDiagram
     SCR-->>Trainer: 200 OK - Reminders processed: X sent, Y failed with sent_to and failed lists
 ```
 
+### Sequence Diagram - Book A Class Endpoint 
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    actor Trainer as Trainer
+    participant JWT as flask_jwt_extended
+    participant SCR as SendClassReminder
+    participant CR as ClassResource
+    participant DB as DB
+    participant MongoDB as MongoDB
+    participant Utils as utils
+    participant UR as UserResource
+    participant Email as send_class_reminder
+    participant Env as OS Environment
+    participant SES as AWS SES
+
+    %% Step 1: HTTP Request
+    Trainer->>JWT: POST /admin/class_id/remind - Authorization: Bearer token
+
+    %% Step 2: JWT Validation
+    JWT->>JWT: Validate JWT signature and expiry
+    alt JWT invalid or missing
+        JWT-->>Trainer: 401 Unauthorized
+    end
+    JWT->>SCR: Forward request with claims and identity
+
+    %% Step 3: Role Check
+    SCR->>SCR: get_jwt() - check claims role == trainer
+    alt role is not trainer
+        SCR-->>Trainer: 403 Forbidden - Only trainers can send reminder emails
+    end
+
+    %% Step 4: Look Up the Class
+    SCR->>CR: get_class_by_id(class_id, str)
+    CR->>CR: Convert class_id to ObjectId
+    alt class_id is not a valid ObjectId
+        CR-->>SCR: None
+    end
+    CR->>DB: get_collection(classes)
+    DB-->>CR: classes Collection
+    CR->>MongoDB: find_one by class ObjectId
+    MongoDB-->>CR: class_doc or None
+    CR->>Utils: serialize_item(class_doc)
+    Utils-->>CR: class_doc with _id converted to string
+    CR-->>SCR: fitness_class dict or None
+
+    alt fitness_class is None
+        SCR-->>Trainer: 404 Not Found - Class not found
+    end
+
+    %% Step 5: Trainer Ownership Check
+    SCR->>SCR: get_jwt_identity() - get trainer_identity
+    SCR->>SCR: check fitness_class trainer_id == trainer_identity
+    alt trainer is not assigned to this class
+        SCR-->>Trainer: 403 Forbidden - You are not the trainer assigned to this class
+    end
+
+    %% Step 6: Fetch Enrolled Members
+    SCR->>SCR: Read user_oids from fitness_class user_ids
+    alt user_oids is empty
+        SCR-->>Trainer: 200 OK - No members enrolled
+    end
+
+    SCR->>UR: get_users_by_ids(user_oids)
+    UR->>DB: get_collection(users)
+    DB-->>UR: users Collection
+    UR->>MongoDB: find users by ObjectId list
+    MongoDB-->>UR: list of user docs
+    UR->>Utils: serialize_items(user_docs)
+    Utils-->>UR: list of user dicts with _id converted to string
+    UR-->>SCR: members list
+
+    %% Step 7: Send Reminder to Each Member
+    loop for each member in members
+        SCR->>Email: send_class_reminder(member_email, member_name, class_info)
+
+        Email->>Env: _get_env(SES_SENDER_EMAIL)
+        Env-->>Email: sender email string
+        Email->>Env: _get_env(AWS_SES_REGION)
+        Env-->>Email: AWS region string
+        Email->>Env: _get_env(AWS_ACCESS_KEY_ID)
+        Env-->>Email: access key string
+        Email->>Env: _get_env(AWS_SECRET_ACCESS_KEY)
+        Env-->>Email: secret key string
+
+        alt any env var is missing or blank
+            Email-->>SCR: raises EnvironmentError
+        end
+
+        Email->>SES: boto3.client(ses, region, key_id, secret_key)
+        SES-->>Email: ses_client
+
+        Email->>Email: Format date_str, start_str, end_str from class_info
+        Email->>Email: Build subject and plain-text body
+
+        Email->>SES: ses_client.send_email(Source, Destination, Message)
+
+        alt email sent successfully
+            SES-->>Email: success response
+            Email-->>SCR: True, empty string
+            SCR->>SCR: append email to successes list
+        else SES ClientError
+            SES-->>Email: ClientError exception
+            Email-->>SCR: False, error_message
+            SCR->>SCR: append email and error to failures list
+        end
+    end
+
+    %% Step 8: Return Summary
+    SCR-->>Trainer: 200 OK - Reminders processed: X sent, Y failed with sent_to and failed lists
+
+```
 ---
 
 ## Task 2: Design Principle Violations
