@@ -126,37 +126,18 @@ sequenceDiagram
 
 ## Task 2: Design Principle Violations
 
-### Violation 1 — Single Responsibility Principle (SRP)
-
-**Principle:** A class or function should have only one reason to change.
-
-**Location:** `app/email.py`, function `send_class_reminder()`, lines 16–83
-![send_class_reminder() — app/email.py lines 16–83](assets/violation_1.png)
-
-**Explanation:**
-`send_class_reminder()` conflates four distinct responsibilities in one function:
-
-1. **Configuration loading** (lines 33–36) — reads four environment variables via `_get_env()`
-2. **Client construction** (lines 38–43) — instantiates the `boto3` SES client
-3. **Content formatting** (lines 45–70) — parses datetime objects and builds the subject line and plain-text body
-4. **Email delivery** (lines 72–83) — calls `ses_client.send_email()` and handles `ClientError`
-
-Each of these is a separate reason for the function to change. For example, switching the email body to HTML, changing how credentials are sourced, or replacing SES with another provider would all require modifying this single function. A function with one responsibility should only change for one reason.
-
-
----
-
-### Violation 2 — Open/Closed Principle (OCP)
+### Violation 1 — Open/Closed Principle (OCP)
 
 **Principle:** Software entities should be open for extension but closed for modification.
 
 **Location:**
-- `app/email.py`, `send_class_reminder()`, lines 16–83 (Screenshot attached above in Violation 1)
+- `app/email.py`, `send_class_reminder()`, lines 16–83
+    ![send_class_reminder() — app/email.py lines 16–83](assets/violation_1.png)
 - `app/apis/admin.py`, `SendClassReminder.post()`, line 21 (import) and lines 263–267 (call site)
     ![SendClassReminder.post() call site — app/apis/admin.py lines 263–267](assets/violation_2.png)
 
 **Explanation:**
-The entire notification pipeline is hardwired to a single delivery mechanism — AWS SES email. There is no abstraction or extension point. If Feature 7 (Configure Notifications) requires adding SMS or Telegram, a developer would have to:
+The entire notification pipeline is hardwired to a single delivery mechanism: AWS SES email. There is no abstraction or extension point. If Feature 7 (Configure Notifications) requires adding SMS or Telegram, a developer would have to:
 
 - Modify `send_class_reminder()` or write a parallel function
 - Modify `SendClassReminder.post()` to conditionally call the right channel
@@ -189,5 +170,6 @@ The body of both methods is virtually identical line-for-line. This is a classic
 
 ## Task 4: Reflection on New Features
 
+### Feature 7 — Configure Notifications 
 
-**Feature 7 — Configure Notifications** is where the design violations identified in Tasks 2 and 3 directly compound into a real implementation problem. Three issues make this feature difficult to add cleanly. First, the user document schema in `app/db/users.py` has no field for notification preferences, meaning there is no way to store whether a member wants email, SMS, Telegram, or some combination. Adding this requires a schema change and corresponding updates to `UserResource`, `register_member`, and `register_trainer` (which are already duplicated). Second, the OCP violation in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. Third, the SRP violation in `send_class_reminder()` means the email formatting and delivery logic are fused together, making it impossible to reuse just the formatting step for a different channel without copying code. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
+- As violation 1 in task 2 says, the OCP violation in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
