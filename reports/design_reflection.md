@@ -196,6 +196,9 @@ Both ClassList.get() and EnrolledClasses.get() construct nearly identical dictio
 
 ## Task 4: Reflection on New Features
 
+### Feature 6 - Create Recurring Class
+- The current design will make the implementation difficult from both a maintainability and extensibility perspective. As identified in Task 3, class data formatting is duplicated across multiple endpoints, so adding recurrence-related fields would require changes in several places, increasing the risk of inconsistencies. Additionally, the SRP violation in Task 2 means ClassBooking.post() already combines multiple responsibilities, and extending it to support recurring bookings would further increase its complexity. Overall, the lack of separation of concerns and duplicated logic makes the system harder to scale without refactoring.
+
 ### Feature 7 — Configure Notifications 
 
 - As violation 1 in task 2 says, the OCP violation in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
