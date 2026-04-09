@@ -6,7 +6,7 @@
 
 Visual Studio PyreverseSequence Plugin was used to make an initial sequence diagram for the send class reminder endpoint. This was then edited to incorporate missing lifelines and actors.
 
-## Task 1: 
+## Task 1:
 
 ### Sequence Diagram — Send Class Reminder Endpoint
 
@@ -131,7 +131,7 @@ sequenceDiagram
 **Principle:** A class or function should have only one reason to change.
 
 **Location:** `app/email.py`, function `send_class_reminder()`, lines 16–83
-![send_class_reminder() — app/email.py lines 16–83](assets/violation_1.png)
+send_class_reminder() — app/email.py lines 16–83
 
 **Explanation:**
 `send_class_reminder()` conflates four distinct responsibilities in one function:
@@ -143,7 +143,6 @@ sequenceDiagram
 
 Each of these is a separate reason for the function to change. For example, switching the email body to HTML, changing how credentials are sourced, or replacing SES with another provider would all require modifying this single function. A function with one responsibility should only change for one reason.
 
-
 ---
 
 ### Violation 2 — Open/Closed Principle (OCP)
@@ -151,9 +150,10 @@ Each of these is a separate reason for the function to change. For example, swit
 **Principle:** Software entities should be open for extension but closed for modification.
 
 **Location:**
+
 - `app/email.py`, `send_class_reminder()`, lines 16–83 (Screenshot attached above in Violation 1)
 - `app/apis/admin.py`, `SendClassReminder.post()`, line 21 (import) and lines 263–267 (call site)
-    ![SendClassReminder.post() call site — app/apis/admin.py lines 263–267](assets/violation_2.png)
+  SendClassReminder.post() call site — app/apis/admin.py lines 263–267
 
 **Explanation:**
 The entire notification pipeline is hardwired to a single delivery mechanism — AWS SES email. There is no abstraction or extension point. If Feature 7 (Configure Notifications) requires adding SMS or Telegram, a developer would have to:
@@ -163,7 +163,23 @@ The entire notification pipeline is hardwired to a single delivery mechanism —
 
 This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code.
 
+---
 
+### Violation 3 - Modularity
+
+**Principle:** 1. High cohesion - Modules should contain functions that logically belong together with the attributes they use; 2. Low/weak coupling – Changes to modules should not affect other modules
+
+**Location:**
+
+- `app/admin.py`, `class CreateClass(Resource)`
+CreateClass Endpoint — app/apis/admin.py
+
+**Explanation:**
+The endpoint also performs authentication and input validation
+
+- Authentication: Line 70-72
+- Input validation: Line 80-126
+This violation is also repeated in other endpoints such as SendClassReminder, ClassMemberList
 
 ---
 
@@ -173,21 +189,40 @@ This is a direct violation of OCP. A well-designed system would define a `Notifi
 
 **Location:** `app/db/users.py`, `register_member()` lines 140–169:
 
-![register_member() — app/db/users.py lines 140–169](assets/code_smell_2-u.png)
+register_member() — app/db/users.py lines 140–169
 
 `register_trainer()` lines 200–228
 
-![register_trainer() — app/db/users.py lines 200–228](assets/code_smell_1-t.png)
+register_trainer() — app/db/users.py lines 200–228
 
 **Explanation:**
 The body of both methods is virtually identical line-for-line. This is a classic **Duplicate Code** smell. The duplicated block spans password validation, email uniqueness checking, password hashing, document construction, and database insertion. The shared logic should be extracted into a single private helper method parameterised by role, eliminating the duplication and making future changes to registration logic require a single edit.
 
+---
 
+### Code Smell 2 - Long Parameter List
 
+**Location:** `app/db/classes.py`, `ClassResource`, `create_class()`, line 38
+create_class() — app/db/classes.py lines 38
+
+**Explanation:**
+create_class method has a long parameter list with 8 parameters 
+
+---
+
+### Code smell 3 - Primitive Obsession
+
+**Location:** `app/apis/admin.py`, `class CreateClass(Resource)`, line 80-86 
+CreateClass Endpoint — app/apis/admin.py lines 80-86
+
+**Explanation:**  class data is handled as many raw primitives (name, date_str, start_time, capacity, etc.) instead of a single typed request object, which makes validation and data flow scattered and error-prone.
 
 ---
 
 ## Task 4: Reflection on New Features
 
+**Feature 6 - Create Recurring Class**:
 
-**Feature 7 — Configure Notifications** is where the design violations identified in Tasks 2 and 3 directly compound into a real implementation problem. Three issues make this feature difficult to add cleanly. First, the user document schema in `app/db/users.py` has no field for notification preferences, meaning there is no way to store whether a member wants email, SMS, Telegram, or some combination. Adding this requires a schema change and corresponding updates to `UserResource`, `register_member`, and `register_trainer` (which are already duplicated). Second, the OCP violation in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. Third, the SRP violation in `send_class_reminder()` means the email formatting and delivery logic are fused together, making it impossible to reuse just the formatting step for a different channel without copying code. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
+- *Primitive Obsession* and *Long Parameter List* in Code smell 2,3 will hinder the implementation of feature 6. Create recurring class means adding another attribute to class to manage recurring time. Based on the current implementation, we will have to implement extra validation for this new field and also add another parameter in create_class() method.
+
+**Feature 7 - Configure Notifications**:
