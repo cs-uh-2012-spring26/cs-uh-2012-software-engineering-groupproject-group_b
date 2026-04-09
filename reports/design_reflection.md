@@ -126,60 +126,26 @@ sequenceDiagram
 
 ## Task 2: Design Principle Violations
 
-### Violation 1 — Single Responsibility Principle (SRP)
+<<<<<<< HEAD
 
-**Principle:** A class or function should have only one reason to change.
-
-**Location:** `app/email.py`, function `send_class_reminder()`, lines 16–83
-send_class_reminder() — app/email.py lines 16–83
-
-**Explanation:**
-`send_class_reminder()` conflates four distinct responsibilities in one function:
-
-1. **Configuration loading** (lines 33–36) — reads four environment variables via `_get_env()`
-2. **Client construction** (lines 38–43) — instantiates the `boto3` SES client
-3. **Content formatting** (lines 45–70) — parses datetime objects and builds the subject line and plain-text body
-4. **Email delivery** (lines 72–83) — calls `ses_client.send_email()` and handles `ClientError`
-
-Each of these is a separate reason for the function to change. For example, switching the email body to HTML, changing how credentials are sourced, or replacing SES with another provider would all require modifying this single function. A function with one responsibility should only change for one reason.
-
----
-
-### Violation 2 — Open/Closed Principle (OCP)
+### Violation 1 — Open/Closed Principle (OCP)
 
 **Principle:** Software entities should be open for extension but closed for modification.
 
 **Location:**
 
-- `app/email.py`, `send_class_reminder()`, lines 16–83 (Screenshot attached above in Violation 1)
+- `app/email.py`, `send_class_reminder()`, lines 16–83
+  ![send_class_reminder() — app/email.py lines 16–83](assets/violation_1.png)
 - `app/apis/admin.py`, `SendClassReminder.post()`, line 21 (import) and lines 263–267 (call site)
   SendClassReminder.post() call site — app/apis/admin.py lines 263–267
 
 **Explanation:**
-The entire notification pipeline is hardwired to a single delivery mechanism — AWS SES email. There is no abstraction or extension point. If Feature 7 (Configure Notifications) requires adding SMS or Telegram, a developer would have to:
+The entire notification pipeline is hardwired to a single delivery mechanism: AWS SES email. There is no abstraction or extension point. If Feature 7 (Configure Notifications) requires adding SMS or Telegram, a developer would have to:
 
 - Modify `send_class_reminder()` or write a parallel function
 - Modify `SendClassReminder.post()` to conditionally call the right channel
 
 This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code.
-
----
-
-### Violation 3 - Modularity
-
-**Principle:** 1. High cohesion - Modules should contain functions that logically belong together with the attributes they use; 2. Low/weak coupling – Changes to modules should not affect other modules
-
-**Location:**
-
-- `app/admin.py`, `class CreateClass(Resource)`
-CreateClass Endpoint — app/apis/admin.py
-
-**Explanation:**
-The endpoint also performs authentication and input validation
-
-- Authentication: Line 70-72
-- Input validation: Line 80-126
-This violation is also repeated in other endpoints such as SendClassReminder, ClassMemberList
 
 ---
 
@@ -200,29 +166,8 @@ The body of both methods is virtually identical line-for-line. This is a classic
 
 ---
 
-### Code Smell 2 - Long Parameter List
-
-**Location:** `app/db/classes.py`, `ClassResource`, `create_class()`, line 38
-create_class() — app/db/classes.py lines 38
-
-**Explanation:**
-create_class method has a long parameter list with 8 parameters 
-
----
-
-### Code smell 3 - Primitive Obsession
-
-**Location:** `app/apis/admin.py`, `class CreateClass(Resource)`, line 80-86 
-CreateClass Endpoint — app/apis/admin.py lines 80-86
-
-**Explanation:**  class data is handled as many raw primitives (name, date_str, start_time, capacity, etc.) instead of a single typed request object, which makes validation and data flow scattered and error-prone.
-
----
-
 ## Task 4: Reflection on New Features
 
-**Feature 6 - Create Recurring Class**:
+### Feature 7 — Configure Notifications
 
-- *Primitive Obsession* and *Long Parameter List* in Code smell 2,3 will hinder the implementation of feature 6. Create recurring class means adding another attribute to class to manage recurring time. Based on the current implementation, we will have to implement extra validation for this new field and also add another parameter in create_class() method.
-
-**Feature 7 - Configure Notifications**:
+- As violation 1 in task 2 says, the OCP violation in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
