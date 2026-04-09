@@ -122,6 +122,103 @@ sequenceDiagram
     SCR-->>Trainer: 200 OK - Reminders processed: X sent, Y failed with sent_to and failed lists
 ```
 
+### Sequence Diagram - Book A Class Endpoint 
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    actor Member as Member
+    participant JWT as flask_jwt_extended
+    participant CB as ClassBooking
+    participant UR as UserResource
+    participant CR as ClassResource
+    participant DB as DB
+    participant MongoDB as MongoDB
+    participant Utils as utils
+
+    %% Step 1: HTTP Request
+    Member->>JWT: POST /member/<class_id>/book - Authorization: Bearer token
+
+    %% Step 2: JWT Validation
+    JWT->>JWT: Validate JWT signature and expiry
+    alt JWT invalid or missing
+        JWT-->>Member: 401 Unauthorized
+    end
+    JWT->>CB: Forward request with identity
+
+    %% Step 3: Get logged-in user identity
+    CB->>CB: get_jwt_identity() - extract user_id from token
+
+    %% Step 4: Verify the member exists
+    CB->>UR: get_user_by_id(user_id)
+    UR->>UR: Convert user_id string to ObjectId
+    alt user_id is not a valid ObjectId
+        UR-->>CB: None
+    end
+    UR->>DB: get_collection(users)
+    DB-->>UR: users Collection
+    UR->>MongoDB: find_one user by ObjectId
+    MongoDB-->>UR: user_doc or None
+    UR->>Utils: serialize_item(user_doc)
+    Utils-->>UR: user_doc with _id converted to string
+    UR-->>CB: serialized user or None
+
+    alt user is None
+        CB-->>Member: 404 Not Found - User not found
+    end
+
+    %% Step 5: Attempt to book the class
+    CB->>CR: add_user_to_class(class_id, user_id)
+    CR->>CR: Convert class_id and user_id strings to ObjectIds
+    alt either ID is not a valid ObjectId
+        CR-->>CB: "CLASS_NOT_FOUND"
+    end
+    CR->>DB: get_collection(classes)
+    DB-->>CR: classes Collection
+    CR->>MongoDB: find_one class by ObjectId
+    MongoDB-->>CR: class_doc or None
+
+    alt class_doc is None
+        CR-->>CB: "CLASS_NOT_FOUND"
+        CB-->>Member: 404 Not Found - Class not found
+    end
+
+    CR->>CR: Read user_ids list from class_doc
+    alt user ObjectId already in user_ids
+        CR-->>CB: "ALREADY_BOOKED"
+        CB-->>Member: 409 Conflict - User already booked this class
+    end
+
+    CR->>CR: Compare len(user_ids) against capacity
+    alt len(user_ids) >= capacity
+        CR-->>CB: "CLASS_FULL"
+        CB-->>Member: 409 Conflict - Class is full
+    end
+
+    CR->>MongoDB: update_one classes - $push user_oid into user_ids
+    MongoDB-->>CR: update confirmed
+    CR-->>CB: "BOOKED"
+
+    %% Step 6: Update the member's own record
+    CB->>UR: add_class_to_user(user_id, class_id)
+    UR->>UR: Convert user_id and class_id strings to ObjectIds
+    alt either ID is not a valid ObjectId
+        UR-->>CB: False
+    end
+    UR->>MongoDB: update_one users - $addToSet class_oid into class_ids
+    MongoDB-->>UR: matched_count (1 if user found, 0 if not)
+    UR-->>CB: True or False
+
+    alt False - user not found on second write
+        CB-->>Member: 404 Not Found - User not found
+        Note over MongoDB: Data is now out of sync. Class has the user in user_ids but the user has no record of the class. No rollback occurs.
+    end
+
+    %% Step 7: Return success
+    CB-->>Member: 200 OK - Booked successfully
+
+```
 ---
 
 ## Task 2: Design Principle Violations
@@ -142,9 +239,25 @@ The entire notification pipeline is hardwired to a single delivery mechanism: AW
 - Modify `send_class_reminder()` or write a parallel function
 - Modify `SendClassReminder.post()` to conditionally call the right channel
 
-This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code.
+This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code. 
 
 
+### Violation 3 - Single Responsibility Principle (SRP) 
+**Principle:** A class or function should have only one reason to change.
+
+**Location:** 
+- `app/apis/member.py` , method `ClassBooking.post()`, lines 229-252 
+![ClassBooking.post() srp - app/apis/member.py lines 229-252](assets/violation_3.png) 
+
+
+**Explanation:**
+The ClassBooking.post() method violates SRP by combing multiple responsibilities into a single function: 
+
+1. User lookup (lines 231–236) — retrieves the current user using get_jwt_identity() and validates existence
+2. Class booking logic (lines 238–246) — calls add_user_to_class() and handles different booking outcomes (class full, already booked, etc.)
+3. User update logic (lines 248–250) — updates the user’s enrolled classes via add_class_to_user()
+
+Each of these represents a separate reason for change. For example, modifying booking rules, changing how users are retrieved, or altering how enrollments are stored would all require edits to this same method. This tightly coupled design reduces modularity and makes the function harder to maintain and extend.
 
 ---
 
@@ -164,11 +277,24 @@ This is a direct violation of OCP. A well-designed system would define a `Notifi
 The body of both methods is virtually identical line-for-line. This is a classic **Duplicate Code** smell. The duplicated block spans password validation, email uniqueness checking, password hashing, document construction, and database insertion. The shared logic should be extracted into a single private helper method parameterised by role, eliminating the duplication and making future changes to registration logic require a single edit.
 
 
+### Code Smell 4 — Duplicate Code
 
+**Location:** `app/apis/member.py`
+`ClassList.get()`, lines 104-114 , `EnrolledClasses.get()`, lines 175-186
+
+![ClassList.get() - app/apis/member.py lines 104-114](assets/code_smells_4a.png) 
+
+![ClassList.get() - app/apis/member.py lines 175-186](assets/code_smells_4b.png) 
+
+**Explanation:**
+Both ClassList.get() and EnrolledClasses.get() construct nearly identical dictionary structures with the same keys (e.g., class_name, trainer_name, etc..). This is a clear case of Duplicate Code.A better approach would be to extract this shared logic into a helper function (format_class_response(c, capacity, booked)) and reuse it across both methods.
 
 ---
 
 ## Task 4: Reflection on New Features
+
+### Feature 6 - Create Recurring Class
+- The current design will make the implementation difficult from both a maintainability and extensibility perspective. As identified in Task 3, class data formatting is duplicated across multiple endpoints, so adding recurrence-related fields would require changes in several places, increasing the risk of inconsistencies. Additionally, the SRP violation in Task 2 means ClassBooking.post() already combines multiple responsibilities, and extending it to support recurring bookings would further increase its complexity. Overall, the lack of separation of concerns and duplicated logic makes the system harder to scale without refactoring.
 
 ### Feature 7 — Configure Notifications 
 
