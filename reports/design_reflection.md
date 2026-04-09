@@ -128,112 +128,95 @@ sequenceDiagram
 sequenceDiagram
     autonumber
 
-    actor Trainer as Trainer
+    actor Member as Member
     participant JWT as flask_jwt_extended
-    participant SCR as SendClassReminder
+    participant CB as ClassBooking
+    participant UR as UserResource
     participant CR as ClassResource
     participant DB as DB
     participant MongoDB as MongoDB
     participant Utils as utils
-    participant UR as UserResource
-    participant Email as send_class_reminder
-    participant Env as OS Environment
-    participant SES as AWS SES
 
     %% Step 1: HTTP Request
-    Trainer->>JWT: POST /admin/class_id/remind - Authorization: Bearer token
+    Member->>JWT: POST /member/<class_id>/book - Authorization: Bearer token
 
     %% Step 2: JWT Validation
     JWT->>JWT: Validate JWT signature and expiry
     alt JWT invalid or missing
-        JWT-->>Trainer: 401 Unauthorized
+        JWT-->>Member: 401 Unauthorized
     end
-    JWT->>SCR: Forward request with claims and identity
+    JWT->>CB: Forward request with identity
 
-    %% Step 3: Role Check
-    SCR->>SCR: get_jwt() - check claims role == trainer
-    alt role is not trainer
-        SCR-->>Trainer: 403 Forbidden - Only trainers can send reminder emails
+    %% Step 3: Get logged-in user identity
+    CB->>CB: get_jwt_identity() - extract user_id from token
+
+    %% Step 4: Verify the member exists
+    CB->>UR: get_user_by_id(user_id)
+    UR->>UR: Convert user_id string to ObjectId
+    alt user_id is not a valid ObjectId
+        UR-->>CB: None
+    end
+    UR->>DB: get_collection(users)
+    DB-->>UR: users Collection
+    UR->>MongoDB: find_one user by ObjectId
+    MongoDB-->>UR: user_doc or None
+    UR->>Utils: serialize_item(user_doc)
+    Utils-->>UR: user_doc with _id converted to string
+    UR-->>CB: serialized user or None
+
+    alt user is None
+        CB-->>Member: 404 Not Found - User not found
     end
 
-    %% Step 4: Look Up the Class
-    SCR->>CR: get_class_by_id(class_id, str)
-    CR->>CR: Convert class_id to ObjectId
-    alt class_id is not a valid ObjectId
-        CR-->>SCR: None
+    %% Step 5: Attempt to book the class
+    CB->>CR: add_user_to_class(class_id, user_id)
+    CR->>CR: Convert class_id and user_id strings to ObjectIds
+    alt either ID is not a valid ObjectId
+        CR-->>CB: "CLASS_NOT_FOUND"
     end
     CR->>DB: get_collection(classes)
     DB-->>CR: classes Collection
-    CR->>MongoDB: find_one by class ObjectId
+    CR->>MongoDB: find_one class by ObjectId
     MongoDB-->>CR: class_doc or None
-    CR->>Utils: serialize_item(class_doc)
-    Utils-->>CR: class_doc with _id converted to string
-    CR-->>SCR: fitness_class dict or None
 
-    alt fitness_class is None
-        SCR-->>Trainer: 404 Not Found - Class not found
+    alt class_doc is None
+        CR-->>CB: "CLASS_NOT_FOUND"
+        CB-->>Member: 404 Not Found - Class not found
     end
 
-    %% Step 5: Trainer Ownership Check
-    SCR->>SCR: get_jwt_identity() - get trainer_identity
-    SCR->>SCR: check fitness_class trainer_id == trainer_identity
-    alt trainer is not assigned to this class
-        SCR-->>Trainer: 403 Forbidden - You are not the trainer assigned to this class
+    CR->>CR: Read user_ids list from class_doc
+    alt user ObjectId already in user_ids
+        CR-->>CB: "ALREADY_BOOKED"
+        CB-->>Member: 409 Conflict - User already booked this class
     end
 
-    %% Step 6: Fetch Enrolled Members
-    SCR->>SCR: Read user_oids from fitness_class user_ids
-    alt user_oids is empty
-        SCR-->>Trainer: 200 OK - No members enrolled
+    CR->>CR: Compare len(user_ids) against capacity
+    alt len(user_ids) >= capacity
+        CR-->>CB: "CLASS_FULL"
+        CB-->>Member: 409 Conflict - Class is full
     end
 
-    SCR->>UR: get_users_by_ids(user_oids)
-    UR->>DB: get_collection(users)
-    DB-->>UR: users Collection
-    UR->>MongoDB: find users by ObjectId list
-    MongoDB-->>UR: list of user docs
-    UR->>Utils: serialize_items(user_docs)
-    Utils-->>UR: list of user dicts with _id converted to string
-    UR-->>SCR: members list
+    CR->>MongoDB: update_one classes - $push user_oid into user_ids
+    MongoDB-->>CR: update confirmed
+    CR-->>CB: "BOOKED"
 
-    %% Step 7: Send Reminder to Each Member
-    loop for each member in members
-        SCR->>Email: send_class_reminder(member_email, member_name, class_info)
+    %% Step 6: Update the member's own record
+    CB->>UR: add_class_to_user(user_id, class_id)
+    UR->>UR: Convert user_id and class_id strings to ObjectIds
+    alt either ID is not a valid ObjectId
+        UR-->>CB: False
+    end
+    UR->>MongoDB: update_one users - $addToSet class_oid into class_ids
+    MongoDB-->>UR: matched_count (1 if user found, 0 if not)
+    UR-->>CB: True or False
 
-        Email->>Env: _get_env(SES_SENDER_EMAIL)
-        Env-->>Email: sender email string
-        Email->>Env: _get_env(AWS_SES_REGION)
-        Env-->>Email: AWS region string
-        Email->>Env: _get_env(AWS_ACCESS_KEY_ID)
-        Env-->>Email: access key string
-        Email->>Env: _get_env(AWS_SECRET_ACCESS_KEY)
-        Env-->>Email: secret key string
-
-        alt any env var is missing or blank
-            Email-->>SCR: raises EnvironmentError
-        end
-
-        Email->>SES: boto3.client(ses, region, key_id, secret_key)
-        SES-->>Email: ses_client
-
-        Email->>Email: Format date_str, start_str, end_str from class_info
-        Email->>Email: Build subject and plain-text body
-
-        Email->>SES: ses_client.send_email(Source, Destination, Message)
-
-        alt email sent successfully
-            SES-->>Email: success response
-            Email-->>SCR: True, empty string
-            SCR->>SCR: append email to successes list
-        else SES ClientError
-            SES-->>Email: ClientError exception
-            Email-->>SCR: False, error_message
-            SCR->>SCR: append email and error to failures list
-        end
+    alt False - user not found on second write
+        CB-->>Member: 404 Not Found - User not found
+        Note over MongoDB: Data is now out of sync. Class has the user in user_ids but the user has no record of the class. No rollback occurs.
     end
 
-    %% Step 8: Return Summary
-    SCR-->>Trainer: 200 OK - Reminders processed: X sent, Y failed with sent_to and failed lists
+    %% Step 7: Return success
+    CB-->>Member: 200 OK - Booked successfully
 
 ```
 ---
