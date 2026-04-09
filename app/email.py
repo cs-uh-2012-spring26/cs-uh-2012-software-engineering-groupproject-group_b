@@ -3,9 +3,10 @@ from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 from os import environ
 
+load_dotenv()
+
 
 def _get_env(name: str) -> str:
-    load_dotenv(override=True)
     value = environ.get(name, "")
     if not value.strip():
         raise EnvironmentError(f"Required environment variable {name} is not set")
