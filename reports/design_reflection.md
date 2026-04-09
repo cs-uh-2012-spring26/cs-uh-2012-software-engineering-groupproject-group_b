@@ -8,6 +8,185 @@ Visual Studio PyreverseSequence Plugin was used to make an initial sequence diag
 
 ## Task 1: 
 
+### Class Diagram - Show main classes and their associations
+
+# Using mermaid "
+classDiagram
+    direction TB
+    
+    %% Actors 
+    class Trainer {
+        <<actor>>
+        +create_recurring_class()
+        +send_reminder()
+    }
+
+    class Member {
+        <<actor>>
+        +view_class_list()
+        +view_enrolled_classes()
+        +book_class()
+    }
+
+    %% Flask_restx base
+    class Resource {
+        <<abstract>>
+        +get()
+        +post()
+        +put()
+        +delete()
+    }
+
+    %% API RESOURCES (app/apis/)
+    class ClassList {
+        +get() List~Class~
+    }
+
+    class EnrolledClasses {
+        +get() List~Class~
+    }
+
+    class ClassBooking {
+        +post(class_id) Response
+    }
+
+    class CreateClass {
+        +post() Response
+    }
+
+    class ClassMemberList {
+        +get(class_id) List~Member~
+    }
+
+    class SendClassReminder {
+        +post(class_id) Response
+    }
+
+    class MemberLogin {
+        +post() Token
+    }
+
+    class MemberRegister {
+        +post() Response
+    }
+
+    class TrainerLogin {
+        +post() Token
+    }
+
+    class TrainerRegister {
+        +post() Response
+    }
+
+    %% DATABASE CLASSES (app/db/)
+    class DB {
+        -_db: MongoClient
+        -_instance: DB
+        +get_instance() DB
+        +get_collection(name) Collection
+        -_get() Connection
+    }
+
+    class ClassResource {
+        +get_class_by_id(class_id) Class
+        +add_user_to_class(class_id, user_id) str
+        +create_class(class_data) Response
+        +update_class(class_id, data) Response
+        +delete_class(class_id) Response
+    }
+
+    class UserResource {
+        +get_user_by_id(user_id) User
+        +get_users_by_ids(user_ids) List~User~
+        +add_class_to_user(user_id, class_id) bool
+        +create_user(user_data) Response
+        +update_user(user_id, data) Response
+    }
+
+    %% DATA ENTITIES
+    class User {
+        -user_id: ObjectId
+        -name: str
+        -email: str
+        -password_hash: str
+        -role: str
+        -enrolled_class_ids: List~ObjectId~
+        +to_dict() dict
+    }
+
+    class Class {
+        -class_id: ObjectId
+        -name: str
+        -trainer_name: str
+        -trainer_id: ObjectId
+        -start_time: datetime
+        -end_time: datetime
+        -description: str
+        -room_number: str
+        -capacity: int
+        -user_ids: List~ObjectId~
+        +is_full() bool
+        +get_status() str
+        +to_dict() dict
+    }
+
+    class Enrollment {
+        <<association>>
+        -booking_date: datetime
+        -status: str
+        +confirm() void
+        +cancel() void
+    }
+
+    class Config {
+        -MONGO_URI: str
+        -JWT_SECRET_KEY: str
+        -AWS_SES_REGION: str
+        -AWS_ACCESS_KEY_ID: str
+        -AWS_SECRET_ACCESS_KEY: str
+        +from_env() Config
+    }
+
+    %% INHERITANCE RELATIONSHIPS 
+    Resource <|-- ClassList : inherits
+    Resource <|-- EnrolledClasses : inherits
+    Resource <|-- ClassBooking : inherits
+    Resource <|-- CreateClass : inherits
+    Resource <|-- ClassMemberList : inherits
+    Resource <|-- SendClassReminder : inherits
+    Resource <|-- MemberLogin : inherits
+    Resource <|-- MemberRegister : inherits
+    Resource <|-- TrainerLogin : inherits
+    Resource <|-- TrainerRegister : inherits
+
+    %% DEPENDENCY RELATIONSHIPS(uses)
+    ClassList ..> DB : uses
+    EnrolledClasses ..> DB : uses
+    ClassBooking ..> UserResource : uses
+    ClassBooking ..> ClassResource : uses
+    CreateClass ..> ClassResource : uses
+    ClassMemberList ..> ClassResource : uses
+    SendClassReminder ..> ClassResource : uses
+    SendClassReminder ..> UserResource : uses
+    ClassResource ..> DB : uses
+    UserResource ..> DB : uses
+    DB ..> Config : uses
+
+    %% ASSOCIATION RELATIONSHIPS 
+    ClassResource --> Class : manages
+    UserResource --> User : manages
+    
+    User "1..*" -- "1..*" Class : books >
+    Enrollment -- User : records for
+    Enrollment -- Class : records for
+
+    %% ACTOR TO RESOURCE RELATIONSHIPS
+    Member --> ClassList : views
+    Member --> EnrolledClasses : views
+    Member --> ClassBooking : books
+    Trainer --> CreateClass : creates
+    Trainer --> SendClassReminder : sends
+
 ### Sequence Diagram — Send Class Reminder Endpoint
 
 ```mermaid
@@ -163,6 +342,25 @@ The entire notification pipeline is hardwired to a single delivery mechanism —
 
 This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code.
 
+### Violation 3 - Abstraction principle
+
+**Principle:** The design of a class makes clients understand what it does and how to use it without caring about details
+
+**Location:** 
+- `app/member.py`, `EnrolledClasses.get()`, lines 129-162 and 166-190 (screenshoot attached in violation3_1 and violation 3_2)
+
+**Explanation:**
+This code violates the principle of abstraction becaus ethe client needs to know to much of the internal details of the class to be ablle to get a list of enrolled classes. Nmaely:
+- Database collection names such as MongoDB, collection is "classes",...
+- MongoDB query syntax
+- Exact field names inside documents like "user_ids", "start_time",...
+- How to calculate class status
+
+All of this shows violation of abstraction because a good system design would allow the client to remain unaffected if and when the repository class changes for instance when we need to add a new feature that might affect the database. 
+
+A well designed system would have `classes_collection` abstract that accesses the database on its own and finds the list of required classes, and a `status` abstract to calculate the status of a class. The only information the client would need is to call these abstract classes and get results.
+
+
 
 
 ---
@@ -182,6 +380,20 @@ This is a direct violation of OCP. A well-designed system would define a `Notifi
 **Explanation:**
 The body of both methods is virtually identical line-for-line. This is a classic **Duplicate Code** smell. The duplicated block spans password validation, email uniqueness checking, password hashing, document construction, and database insertion. The shared logic should be extracted into a single private helper method parameterised by role, eliminating the duplication and making future changes to registration logic require a single edit.
 
+### Code Smell 2 - Long Method 
+Many lines of code in a method making it hard to understand.
+
+**Location:** 
+- `tests/unit/test_view_classlist.py`, `test_complete_workflow` lines 268-314
+(Screenshoot attached in code_smell2)
+
+**Explanation:**
+This method is too long because it goes over 30+ lines of code. Since this is a test for overall workflow of the get class list method, it tests multiple things simultaneously. For instance it does:
+- Setting up mocks for database
+- Testing the "get all classes" endpoint
+- Testing the "get enrolled classes" endpoint
+
+A client needs to understand the flow of the code and previous tests to know what is being tested, how and when. This makes the code hard to understand and maintain, hence, the code smell. To make the process simpler, the code should be extracted and broken down into smaller focused test methods.
 
 
 
