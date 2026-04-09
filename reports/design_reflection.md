@@ -142,9 +142,25 @@ The entire notification pipeline is hardwired to a single delivery mechanism: AW
 - Modify `send_class_reminder()` or write a parallel function
 - Modify `SendClassReminder.post()` to conditionally call the right channel
 
-This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code.
+This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code. 
 
 
+### Violation 3 - Single Responsibility Principle (SRP) 
+**Principle:** A class or function should have only one reason to change.
+
+**Location:** 
+- `app/apis/member.py` , method `ClassBooking.post()`, lines 229-252 
+![ClassBooking.post() srp - app/apis/member.py lines 229-252](assets/violation_3.png) 
+
+
+**Explanation:**
+The ClassBooking.post() method violates SRP by combing multiple responsibilities into a single function: 
+
+1. User lookup (lines 231–236) — retrieves the current user using get_jwt_identity() and validates existence
+2. Class booking logic (lines 238–246) — calls add_user_to_class() and handles different booking outcomes (class full, already booked, etc.)
+3. User update logic (lines 248–250) — updates the user’s enrolled classes via add_class_to_user()
+
+Each of these represents a separate reason for change. For example, modifying booking rules, changing how users are retrieved, or altering how enrollments are stored would all require edits to this same method. This tightly coupled design reduces modularity and makes the function harder to maintain and extend.
 
 ---
 
@@ -164,7 +180,17 @@ This is a direct violation of OCP. A well-designed system would define a `Notifi
 The body of both methods is virtually identical line-for-line. This is a classic **Duplicate Code** smell. The duplicated block spans password validation, email uniqueness checking, password hashing, document construction, and database insertion. The shared logic should be extracted into a single private helper method parameterised by role, eliminating the duplication and making future changes to registration logic require a single edit.
 
 
+### Code Smell 4 — Duplicate Code
 
+**Location:** `app/apis/member.py`
+`ClassList.get()`, lines 104-114 , `EnrolledClasses.get()`, lines 175-186
+
+![ClassList.get() - app/apis/member.py lines 104-114](assets/code_smells_4a.png) 
+
+![ClassList.get() - app/apis/member.py lines 175-186](assets/code_smells_4b.png) 
+
+**Explanation:**
+Both ClassList.get() and EnrolledClasses.get() construct nearly identical dictionary structures with the same keys (e.g., class_name, trainer_name, etc..). This is a clear case of Duplicate Code.A better approach would be to extract this shared logic into a helper function (format_class_response(c, capacity, booked)) and reuse it across both methods.
 
 ---
 
