@@ -18,25 +18,25 @@ Raissa:
 
 Mustafa:
 - Created the sequence diagram for the Send Class Reminder endpoint using the Visual Studio PyReverseSequence Plugin, then manually refined it (Task 1)
-- Identified Violations 1 (OCP) and 2 (Modularity) in `app/email.py` and `app/apis/admin.py` (Task 2)
-- Identified Code Smells 1 (Duplicate Code) and 2 (Long Parameter List) in `app/db/users.py` and `app/db/classes.py` (Task 3)
+- Identified Violations 1 (OCP) and 2 (Modularity) in `app/email.py` (Task 2)
+- Identified Code Smells 1 (Duplicate Code) in `app/db/users.py` (Task 3)
 - Added reflection on Feature 7 based on existing code design (Task 4)
 
 Tinh:
-- Identified Violation 2 (Modularity) in `app/apis/admin.py` for Feature 1 (Task 2)
-- Identified Code Smells 2 (Primitive Obsession) and 3 for Feature 1 in `app/apis/admin.py` (Task 3)
+- Identified Violation 3 (Modularity) in `app/apis/admin.py` for Feature 1 (Task 2)
+- Identified Code Smells 3 (Primitive Obsession) and 4 for Feature 1 in `app/apis/admin.py` (Task 3)
 - Added reflection on Feature 7 based on existing code design (Task 4)
 
 Maryam:
-- Identified Violation 3 (SRP) in `app/apis/member.py` for Feature 3 (Task 2)
-- Identified Code Smell 4 (Duplicate Code) in `app/apis/member.py` for Feature 3 (Task 3)
+- Identified Violation 4 (SRP) in `app/apis/member.py` for Feature 3 (Task 2)
+- Identified Code Smell 5 (Duplicate Code) in `app/apis/member.py` for Feature 3 (Task 3)
 - Added reflection on Feature 6 based on existing code design (Task 4)
 - Created the sequence diagram for the Book endpoint 
 
 Uditi:
 - Reviewed and contributed to the Book a Class sequence diagram (Task 1)
-- Identified Violations 4 (OCP) and 5 (Modularity) in `app/apis/admin.py` and `tests/unit/test_admin.py` (Task 2)
-- Identified Code Smells 5 (Magic Strings) and 6 (Long Method) in `tests/unit/test_admin.py` and `app/apis/admin.py` (Task 3)
+- Identified Violations 5 (OCP) and 6 (Modularity) in `app/apis/admin.py` and `tests/unit/test_admin.py` (Task 2)
+- Identified Code Smells 6 (Magic Strings) and 7 (Long Method) in `tests/unit/test_admin.py` and `app/apis/admin.py` (Task 3)
 - Added reflection on Feature 6 based on findings in Feature 4 code (Task 4)
 
 ## Task 1:
