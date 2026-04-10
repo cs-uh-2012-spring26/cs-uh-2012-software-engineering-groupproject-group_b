@@ -442,7 +442,10 @@ This is a direct violation of OCP. A well-designed system would define a `Notifi
 **Principle:** The design of a class makes clients understand what it does and how to use it without caring about details
 
 **Location:** 
-- `app/member.py`, `EnrolledClasses.get()`, lines 129-162 and 166-190 (screenshoot attached in violation2_1 and violation 2_2)
+- `app/member.py`, `EnrolledClasses.get()`, lines 129-162 and 166-190
+
+![EnrolledClasses.get(), lines 129-162 and 166-190](assets/violation_2_1.png)
+![EnrolledClasses.get(), lines 129-162 and 166-190](assets/violation_2_2.png)
 
 **Explanation:**
 This code violates the principle of abstraction becaus ethe client needs to know to much of the internal details of the class to be ablle to get a list of enrolled classes. Nmaely:
