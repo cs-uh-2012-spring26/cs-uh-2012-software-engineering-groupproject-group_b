@@ -188,7 +188,6 @@ class EnrolledClasses(Resource):
 
         return result
 
-#FEATURE 3: Book a class (for members only)
 
 # BOOK CLASS FEATURE (FOR MEMBER)
 _UNAUTHORIZED_RESPONSE = api.model(
