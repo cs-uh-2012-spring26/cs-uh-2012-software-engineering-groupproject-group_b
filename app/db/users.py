@@ -95,7 +95,6 @@ class UserResource:
         return serialize_items(list(users))
 
 
-#uditi's function 
     def get_user_by_id(self, user_id: str):
         """
         Find ONE user document by its Mongo _id.
