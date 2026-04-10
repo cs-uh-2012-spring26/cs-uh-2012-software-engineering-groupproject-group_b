@@ -457,7 +457,7 @@ A well designed system would have `classes_collection` abstract that accesses th
 
 ---
 
-### Violation 2 - Modularity
+### Violation 3 - Modularity Principle
 
 **Principle:** 1. High cohesion - Modules should contain functions that logically belong together with the attributes they use; 2. Low/weak coupling – Changes to modules should not affect other modules
 
@@ -475,7 +475,7 @@ The endpoint also performs authentication and input validation
 
 This violation is also repeated in other endpoints such as SendClassReminder, ClassMemberList
 
-### Violation 3 - Single Responsibility Principle (SRP) 
+### Violation 4 - Single Responsibility Principle (SRP) 
 **Principle:** A class or function should have only one reason to change.
 
 **Location:** 
@@ -494,7 +494,7 @@ Each of these represents a separate reason for change. For example, modifying bo
 
 ---
 
-### Violation 4 - Open/Closed Principle (OCP)
+### Violation 5 - Open/Closed Principle (OCP)
 
 **Principle:** Software entities should be open for extension but closed for modification.
 
@@ -506,7 +506,7 @@ The role check uses a hardcoded list: `if role not in ("trainer", "admin")`. If 
 
 ---
 
-### Violation 5 - Modularity Principle
+### Violation 6 - Modularity Principle
 
 **Principle:** High cohesion and low coupling. Modules should be broken into reusable, independent pieces, and changes to one module should not force changes in others.
 
