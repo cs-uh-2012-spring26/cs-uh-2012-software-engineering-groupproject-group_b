@@ -2,6 +2,17 @@
 
 ## Executive Summary:
 
+To complete task 1 diagrams, we have utilized pyreverse to get the starting diagrams. 
+
+We have maullay analyzed the code to figure out the existence of design violations and code smells. With reference to the slides, for what each violation means, we have been able to identify and icnlude theri screenshots as required.
+
+# Team member responsibilities
+
+Raissa: 
+- Created the class diagram to show mian classes and their associations
+- Added a design principle violation for task 2 
+- Added a code smell found in tests for task 3
+- Added reflection for the new features with reference to existing code design
 ### Tools Used:
 
 Visual Studio PyreverseSequence Plugin was used to make an initial sequence diagram for the send class reminder endpoint. This was then edited to incorporate missing lifelines and actors.
@@ -420,12 +431,12 @@ The entire notification pipeline is hardwired to a single delivery mechanism: AW
 
 This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code. 
 
-### Violation 3 - Abstraction principle
+### Violation 2 - Abstraction principle
 
 **Principle:** The design of a class makes clients understand what it does and how to use it without caring about details
 
 **Location:** 
-- `app/member.py`, `EnrolledClasses.get()`, lines 129-162 and 166-190 (screenshoot attached in violation3_1 and violation 3_2)
+- `app/member.py`, `EnrolledClasses.get()`, lines 129-162 and 166-190 (screenshoot attached in violation2_1 and violation 2_2)
 
 **Explanation:**
 This code violates the principle of abstraction becaus ethe client needs to know to much of the internal details of the class to be ablle to get a list of enrolled classes. Nmaely:
@@ -508,6 +519,11 @@ Both ClassList.get() and EnrolledClasses.get() construct nearly identical dictio
 ### Feature 6 - Create Recurring Class
 - The current design will make the implementation difficult from both a maintainability and extensibility perspective. As identified in Task 3, class data formatting is duplicated across multiple endpoints, so adding recurrence-related fields would require changes in several places, increasing the risk of inconsistencies. Additionally, the SRP violation in Task 2 means ClassBooking.post() already combines multiple responsibilities, and extending it to support recurring bookings would further increase its complexity. Overall, the lack of separation of concerns and duplicated logic makes the system harder to scale without refactoring.
 
+- This feature will need us to add recurrence fields which will require to modify every API endpoint that works with class data. The current design we have has abstraction issues which will make the extensibility and maintainability of the code difficult. Since API already knows field names, adding a new feature will need complete modification of these endpoints to include these fields. This will increase the risk of making errors that lead to more violations. 
+
+- The current design already has code smells such as long method. With the addition of this new feature that will require definition of the recurrence_logic such as a `get_recurrence` will add more lines to the already existing code. If the design is not corretced, this new recurrence logic wold lead to more code smells making reading and formatting harder to understand. 
 ### Feature 7 — Configure Notifications 
 
 - As violation 1 in task 2 says, the OCP violation in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
+
+- 
