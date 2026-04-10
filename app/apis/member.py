@@ -58,7 +58,6 @@ CLASS_MODEL = api.model(
     }
 )
 
-#FEATURE 1: View list of all classes (for members and guests)
 @api.route("")
 # The resource handler for the class list endpoint. this class handles GET requests for fetching up
 # upcoming classes
