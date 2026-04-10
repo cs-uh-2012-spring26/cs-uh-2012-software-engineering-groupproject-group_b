@@ -2,31 +2,48 @@
 
 ## Executive Summary:
 
-To complete task 1 diagrams, we have utilized pyreverse to get the starting diagrams. 
+For Task 1, we used the Visual Studio PyReverseSequence Plugin to generate an initial sequence diagram for the Send Class Reminder endpoint. This gave us a starting structure, which we then expanded manually to add missing lifelines, actors, and interaction details that the tool did not capture automatically. The class diagram and the Book a Class sequence diagram were built manually based on direct reading of the codebase. No tools were used for Tasks 2, 3, or 4.
 
-We have maullay analyzed the code to figure out the existence of design violations and code smells. With reference to the slides, for what each violation means, we have been able to identify and icnlude theri screenshots as required.
+For Tasks 2 and 3, each team member manually analyzed the code they worked on to identify design principle violations and code smells. We referenced course material to confirm what each violation and smell means before writing up our findings.
+
+For Task 4, we used the violations and smells found in Tasks 2 and 3 as a basis to reason about how the two new proposed features would interact with the current design, and where the existing issues would create friction during implementation. Each team member contributed to the reflection based on their own findings. Detailed responsibilities are listed in the section below.
 
 # Team member responsibilities
 
-Raissa: 
-- Created the class diagram to show mian classes and their associations
-- Added a design principle violation for task 2 
-- Added a code smell found in tests for task 3
-- Added reflection for the new features with reference to existing code design
-### Tools Used:
+Raissa:
+- Created the class diagram showing main classes and their associations (Task 1)
+- Identified Violation 2 (Abstraction) in `app/apis/member.py` (Task 2)
+- Identified Code Smell 2 (Long Method) in `tests/unit/test_view_classlist.py` (Task 3)
+- Added reflection on Feature 6 based on existing code design (Task 4)
 
-Visual Studio PyreverseSequence Plugin was used to make an initial sequence diagram for the send class reminder endpoint. This was then edited to incorporate missing lifelines and actors.
+Mustafa:
+- Created the sequence diagram for the Send Class Reminder endpoint using the Visual Studio PyReverseSequence Plugin, then manually refined it (Task 1)
+- Identified Violations 1 (OCP) and 2 (Modularity) in `app/email.py` and `app/apis/admin.py` (Task 2)
+- Identified Code Smells 1 (Duplicate Code) and 2 (Long Parameter List) in `app/db/users.py` and `app/db/classes.py` (Task 3)
+- Added reflection on Feature 7 based on existing code design (Task 4)
+
+Tinh:
+- Identified Violation 2 (Modularity) in `app/apis/admin.py` for Feature 1 (Task 2)
+- Identified Code Smells 2 (Primitive Obsession) and 3 for Feature 1 in `app/apis/admin.py` (Task 3)
+- Added reflection on Feature 7 based on existing code design (Task 4)
+
+Maryam:
+- Identified Violation 3 (SRP) in `app/apis/member.py` for Feature 3 (Task 2)
+- Identified Code Smell 4 (Duplicate Code) in `app/apis/member.py` for Feature 3 (Task 3)
+- Added reflection on Feature 6 based on existing code design (Task 4)
+- Created the sequence diagram for the Book endpoint 
 
 Uditi:
-- Added design principle violations in task 2 from Feature 4 implementation and tests
-- Added code smells found in Feature 4 tests and implementation for task 3
-- Added reflection points for task 4 based on findings in Feature 4 code
+- Reviewed and contributed to the Book a Class sequence diagram (Task 1)
+- Identified Violations 4 (OCP) and 5 (Modularity) in `app/apis/admin.py` and `tests/unit/test_admin.py` (Task 2)
+- Identified Code Smells 5 (Magic Strings) and 6 (Long Method) in `tests/unit/test_admin.py` and `app/apis/admin.py` (Task 3)
+- Added reflection on Feature 6 based on findings in Feature 4 code (Task 4)
 
 ## Task 1:
 
 ### Class Diagram - Show main classes and their associations
 
-# Using mermaid "
+```mermaid
 classDiagram
     direction TB
     
@@ -202,6 +219,7 @@ classDiagram
     Member --> ClassBooking : books
     Trainer --> CreateClass : creates
     Trainer --> SendClassReminder : sends
+```
 
 ### Sequence Diagram — Send Class Reminder Endpoint
 
@@ -480,8 +498,6 @@ The endpoint also performs authentication and input validation
 
 This violation is also repeated in other endpoints such as SendClassReminder, ClassMemberList
 
----
-
 ### Violation 4 - Single Responsibility Principle (SRP) 
 **Principle:** A class or function should have only one reason to change.
 
@@ -627,5 +643,5 @@ The method is 34 lines long and performs five distinct jobs: checking the reques
 ### Feature 7 — Configure Notifications
 
 - As _violation 1_ in task 2 says, the_ OCP violation_ in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
-
 - There is no way to store whether a member wants email, SMS, Telegram, or some combination. Adding this requires a schema change and corresponding updates to UserResource, register_member, and register_trainer. These endpoints are duplicated (_Code Smell 1- Duplicate Code_) so updating a schema then will entail updating multiple other places, making the program error-prone.
+
