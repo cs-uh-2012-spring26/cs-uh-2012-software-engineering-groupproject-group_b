@@ -58,7 +58,6 @@ CLASS_MODEL = api.model(
     }
 )
 
-
 @api.route("")
 # The resource handler for the class list endpoint. this class handles GET requests for fetching up
 # upcoming classes
@@ -196,9 +195,10 @@ _UNAUTHORIZED_RESPONSE = api.model(
         example="Missing or invalid token")}
 )
 
-
 @api.route("/<class_id>/book")
 @api.param("class_id", "Class id to book")
+
+
 class ClassBooking(Resource):
 
     @jwt_required()

@@ -17,6 +17,11 @@ Raissa:
 
 Visual Studio PyreverseSequence Plugin was used to make an initial sequence diagram for the send class reminder endpoint. This was then edited to incorporate missing lifelines and actors.
 
+Uditi:
+- Added design principle violations in task 2 from Feature 4 implementation and tests
+- Added code smells found in Feature 4 tests and implementation for task 3
+- Added reflection points for task 4 based on findings in Feature 4 code
+
 ## Task 1:
 
 ### Class Diagram - Show main classes and their associations
@@ -489,6 +494,30 @@ Each of these represents a separate reason for change. For example, modifying bo
 
 ---
 
+### Violation 4 - Open/Closed Principle (OCP)
+
+**Principle:** Software entities should be open for extension but closed for modification.
+
+**Location:**
+- `app/apis/admin.py`, `ClassMemberList.get()`, line 166
+
+**Explanation:**
+The role check uses a hardcoded list: `if role not in ("trainer", "admin")`. If a new role such as "manager" needs access to this endpoint in the future, a developer must open this file and edit this exact line. A better design would store allowed roles in a configuration or use a decorator, so new roles could be added without modifying the method body at all. This pattern is also repeated across other endpoints in the same file, meaning each one would need to be edited individually.
+
+---
+
+### Violation 5 - Modularity Principle
+
+**Principle:** High cohesion and low coupling. Modules should be broken into reusable, independent pieces, and changes to one module should not force changes in others.
+
+**Location:**
+- `tests/unit/test_admin.py`, lines 49, 81, 103, 138
+
+**Explanation:**
+The same mock setup for `ClassResource` is copied identically into four different test functions. Instead of writing a shared helper or pytest fixture for this repeated setup, the block is duplicated four times across the file. If the import path of `ClassResource` changes, every one of these four lines must be updated manually. A shared pytest fixture would centralize this setup, making the tests more modular and easier to maintain when the production code changes.
+
+---
+
 ## Task 3: Code Smells
 
 ### Code Smell 1 — Duplicate Code
@@ -553,11 +582,33 @@ Both ClassList.get() and EnrolledClasses.get() construct nearly identical dictio
 
 ---
 
+### Code Smell 5 - Magic Strings
+
+**Location:** `tests/unit/test_admin.py`, lines 60, 86, 121, 143
+
+**Explanation:**
+The URL string `"/admin/class-1/members"` and the class ID `"class-1"` are hardcoded identically across four different test functions. If the URL structure changes, every one of those lines must be updated manually. Defining these as a named constant at the top of the file would mean a single change covers all four tests.
+
+---
+
+### Code Smell 6 - Long Method
+
+**Location:** `app/apis/admin.py`, `ClassMemberList.get()`, lines 160-194
+
+**Explanation:**
+The method is 34 lines long and performs five distinct jobs: checking the requester's role, looking up the class by ID, extracting the list of user IDs, fetching full user details, and formatting the response. This is a Long Method smell. Each of these steps could be extracted into a smaller, named helper so that each piece is easier to read, test, and change on its own. As it stands, any change to role checking, data fetching, or response formatting all touch the same method.
+
+---
+
 ## Task 4: Reflection on New Features
 
 ### Feature 6 - Create Recurring Class
 
 - _Primitive Obsession_ and _Long Parameter List_ in Code smell 2,3 will hinder the implementation of feature 6. Create recurring class means adding another attribute to class to manage recurring time. Based on the current implementation, we will have to implement extra validation for this new field and also add another parameter in create_class() method.
+
+- The OCP violation in `ClassMemberList.get()` (Violation 4) means that if Feature 6 introduces a new role type, such as a dedicated recurring class manager, access control would require direct edits to multiple endpoint methods rather than a single config change. This makes expanding role-based access risky and error-prone.
+
+- `ClassMemberList.get()` already performs five distinct jobs in 34 lines (Smell 6). Adding recurring class support, such as filtering or grouping the member list by recurrence, would extend this method further and make the Long Method smell significantly worse.
 
 ### Feature 7 — Configure Notifications
 - The current design will make the implementation difficult from both a maintainability and extensibility perspective. As identified in Task 3, class data formatting is duplicated across multiple endpoints, so adding recurrence-related fields would require changes in several places, increasing the risk of inconsistencies. Additionally, the SRP violation in Task 2 means ClassBooking.post() already combines multiple responsibilities, and extending it to support recurring bookings would further increase its complexity. Overall, the lack of separation of concerns and duplicated logic makes the system harder to scale without refactoring.

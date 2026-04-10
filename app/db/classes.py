@@ -49,6 +49,7 @@ class ClassResource:
         result = self.collection.insert_one(class_doc)
         return result.inserted_id
 
+
     def get_class_by_id(self,class_id,str):
         """
         Find ONE class document by its Mongo _id.
