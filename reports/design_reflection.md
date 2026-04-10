@@ -2,9 +2,11 @@
 
 ## Executive Summary:
 
-To complete task 1 diagrams, we have utilized pyreverse to get the starting diagrams. 
+For Task 1, we used the Visual Studio PyReverseSequence Plugin to generate an initial sequence diagram for the Send Class Reminder endpoint. This gave us a starting structure, which we then expanded manually to add missing lifelines, actors, and interaction details that the tool did not capture automatically. The class diagram and the Book a Class sequence diagram were built manually based on direct reading of the codebase. No tools were used for Tasks 2, 3, or 4.
 
-We have maullay analyzed the code to figure out the existence of design violations and code smells. With reference to the slides, for what each violation means, we have been able to identify and icnlude theri screenshots as required.
+For Tasks 2 and 3, each team member manually analyzed the code they worked on to identify design principle violations and code smells. We referenced course material to confirm what each violation and smell means before writing up our findings.
+
+For Task 4, we used the violations and smells found in Tasks 2 and 3 as a basis to reason about how the two new proposed features would interact with the current design, and where the existing issues would create friction during implementation. Each team member contributed to the reflection based on their own findings. Detailed responsibilities are listed in the section below.
 
 # Team member responsibilities
 
