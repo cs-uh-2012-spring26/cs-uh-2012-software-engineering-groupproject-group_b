@@ -50,7 +50,6 @@ class ClassResource:
         return result.inserted_id
 
 
-#used in uditi's feature 
     def get_class_by_id(self,class_id,str):
         """
         Find ONE class document by its Mongo _id.
