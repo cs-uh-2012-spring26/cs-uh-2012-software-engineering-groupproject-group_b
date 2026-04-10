@@ -58,7 +58,7 @@ CLASS_MODEL = api.model(
     }
 )
 
-
+#FEATURE 1: View list of all classes (for members and guests)
 @api.route("")
 # The resource handler for the class list endpoint. this class handles GET requests for fetching up
 # upcoming classes
@@ -189,6 +189,7 @@ class EnrolledClasses(Resource):
 
         return result
 
+#FEATURE 3: Book a class (for members only)
 
 # BOOK CLASS FEATURE (FOR MEMBER)
 _UNAUTHORIZED_RESPONSE = api.model(
@@ -196,9 +197,10 @@ _UNAUTHORIZED_RESPONSE = api.model(
         example="Missing or invalid token")}
 )
 
-
 @api.route("/<class_id>/book")
 @api.param("class_id", "Class id to book")
+
+
 class ClassBooking(Resource):
 
     @jwt_required()

@@ -144,6 +144,7 @@ MEMBER_MODEL = api.model(
     },
 )
 
+#FEATURE 4: View list of enrolled members for a class (admin/trainer only)
 
 @api.route("/<class_id>/members")
 @api.param("class_id", "The ID of the class")

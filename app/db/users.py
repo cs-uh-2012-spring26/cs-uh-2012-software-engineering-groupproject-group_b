@@ -94,6 +94,8 @@ class UserResource:
         users = self.collection.find(query)
         return serialize_items(list(users))
 
+
+#uditi's function 
     def get_user_by_id(self, user_id: str):
         """
         Find ONE user document by its Mongo _id.
@@ -108,6 +110,7 @@ class UserResource:
 
         user = self.collection.find_one({"_id": oid})
         return serialize_item(user)
+
 
     def get_user_by_email(self, email: str):
         """
