@@ -455,12 +455,17 @@ The entire notification pipeline is hardwired to a single delivery mechanism: AW
 
 This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code. 
 
+---
+
 ### Violation 2 - Abstraction principle
 
 **Principle:** The design of a class makes clients understand what it does and how to use it without caring about details
 
 **Location:** 
-- `app/member.py`, `EnrolledClasses.get()`, lines 129-162 and 166-190 (screenshoot attached in violation2_1 and violation 2_2)
+- `app/member.py`, `EnrolledClasses.get()`, lines 129-162 and 166-190
+
+![EnrolledClasses.get(), lines 129-162 and 166-190](assets/violation_2_1.png)
+![EnrolledClasses.get(), lines 129-162 and 166-190](assets/violation_2_2.png)
 
 **Explanation:**
 This code violates the principle of abstraction becaus ethe client needs to know to much of the internal details of the class to be ablle to get a list of enrolled classes. Nmaely:
@@ -571,12 +576,17 @@ create_class method has a long parameter list with 8 parameters
 ![CreateClass Endpoint — app/apis/admin.py lines 80-86](assets/code_smell_3.png)
 
 **Explanation:** class data is handled as many raw primitives (name, date_str, start_time, capacity, etc.) instead of a single typed request object, which makes validation and data flow scattered and error-prone.
-### Code Smell 2 - Long Method 
+
+---
+
+### Code Smell 4 - Long Method 
 Many lines of code in a method making it hard to understand.
 
 **Location:** 
 - `tests/unit/test_view_classlist.py`, `test_complete_workflow` lines 268-314
-(Screenshoot attached in code_smell2)
+
+![tests/unit/test_view_classlist.py](assets/code_smell2.png) 
+
 
 **Explanation:**
 This method is too long because it goes over 30+ lines of code. Since this is a test for overall workflow of the get class list method, it tests multiple things simultaneously. For instance it does:
@@ -586,7 +596,9 @@ This method is too long because it goes over 30+ lines of code. Since this is a 
 
 A client needs to understand the flow of the code and previous tests to know what is being tested, how and when. This makes the code hard to understand and maintain, hence, the code smell. To make the process simpler, the code should be extracted and broken down into smaller focused test methods.
 
-### Code Smell 4 — Duplicate Code
+---
+
+### Code Smell 5 — Duplicate Code
 
 **Location:** `app/apis/member.py`
 `ClassList.get()`, lines 104-114 , `EnrolledClasses.get()`, lines 175-186
@@ -600,7 +612,7 @@ Both ClassList.get() and EnrolledClasses.get() construct nearly identical dictio
 
 ---
 
-### Code Smell 5 - Magic Strings
+### Code Smell 6 - Magic Strings
 
 **Location:** `tests/unit/test_admin.py`, lines 60, 86, 121, 143
 
@@ -609,7 +621,7 @@ The URL string `"/admin/class-1/members"` and the class ID `"class-1"` are hardc
 
 ---
 
-### Code Smell 6 - Long Method
+### Code Smell 7 - Long Method
 
 **Location:** `app/apis/admin.py`, `ClassMemberList.get()`, lines 160-194
 
@@ -624,18 +636,12 @@ The method is 34 lines long and performs five distinct jobs: checking the reques
 
 - _Primitive Obsession_ and _Long Parameter List_ in Code smell 2,3 will hinder the implementation of feature 6. Create recurring class means adding another attribute to class to manage recurring time. Based on the current implementation, we will have to implement extra validation for this new field and also add another parameter in create_class() method.
 
-- The OCP violation in `ClassMemberList.get()` (Violation 4) means that if Feature 6 introduces a new role type, such as a dedicated recurring class manager, access control would require direct edits to multiple endpoint methods rather than a single config change. This makes expanding role-based access risky and error-prone.
+- This feature will need us to add recurrence fields which will require to modify every API endpoint that works with class data. The current design we have has _abstraction and modularity issues_ which will make the extensibility and maintainability of the code difficult. Since API already knows field names, adding a new feature will need complete modification of these endpoints to include these fields. This will increase the risk of making errors that lead to more violations.
 
-- `ClassMemberList.get()` already performs five distinct jobs in 34 lines (Smell 6). Adding recurring class support, such as filtering or grouping the member list by recurrence, would extend this method further and make the Long Method smell significantly worse.
+- `ClassMemberList.get()` already performs five distinct jobs in 34 lines (_Code Smell 7 - Long Method_). Adding recurring class support, such as filtering or grouping the member list by recurrence, would extend this method further and make the Long Method smell significantly worse.
 
 ### Feature 7 — Configure Notifications
-- The current design will make the implementation difficult from both a maintainability and extensibility perspective. As identified in Task 3, class data formatting is duplicated across multiple endpoints, so adding recurrence-related fields would require changes in several places, increasing the risk of inconsistencies. Additionally, the SRP violation in Task 2 means ClassBooking.post() already combines multiple responsibilities, and extending it to support recurring bookings would further increase its complexity. Overall, the lack of separation of concerns and duplicated logic makes the system harder to scale without refactoring.
 
-- This feature will need us to add recurrence fields which will require to modify every API endpoint that works with class data. The current design we have has abstraction issues which will make the extensibility and maintainability of the code difficult. Since API already knows field names, adding a new feature will need complete modification of these endpoints to include these fields. This will increase the risk of making errors that lead to more violations. 
+- As _violation 1_ in task 2 says, the_ OCP violation_ in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
+- There is no way to store whether a member wants email, SMS, Telegram, or some combination. Adding this requires a schema change and corresponding updates to UserResource, register_member, and register_trainer. These endpoints are duplicated (_Code Smell 1- Duplicate Code_) so updating a schema then will entail updating multiple other places, making the program error-prone.
 
-- The current design already has code smells such as long method. With the addition of this new feature that will require definition of the recurrence_logic such as a `get_recurrence` will add more lines to the already existing code. If the design is not corretced, this new recurrence logic wold lead to more code smells making reading and formatting harder to understand. 
-### Feature 7 — Configure Notifications 
-
-- As violation 1 in task 2 says, the OCP violation in `app/email.py` and `app/apis/admin.py` mean there is no abstraction to extend: the reminder endpoint is hardwired to call one concrete function that delivers one type of notification via one provider. Adding a second channel (SMS, for example) means either bloating `SendClassReminder.post()` with conditional dispatch logic or duplicating the entire endpoint. A `NotificationService` protocol with channel-specific implementations would need to be designed from scratch, and the existing code restructured around it before Feature 7 can be implemented in a maintainable way.
-
-- 
