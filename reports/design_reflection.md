@@ -523,6 +523,7 @@ Each of these represents a separate reason for change. For example, modifying bo
 
 **Location:**
 - `app/apis/admin.py`, `ClassMemberList.get()`, line 166
+  ![ClassMemberList.get() role check — app/apis/admin.py lines 163–167](assets/violation_4.png)
 
 **Explanation:**
 The role check uses a hardcoded list: `if role not in ("trainer", "admin")`. If a new role such as "manager" needs access to this endpoint in the future, a developer must open this file and edit this exact line. A better design would store allowed roles in a configuration or use a decorator, so new roles could be added without modifying the method body at all. This pattern is also repeated across other endpoints in the same file, meaning each one would need to be edited individually.
@@ -535,6 +536,10 @@ The role check uses a hardcoded list: `if role not in ("trainer", "admin")`. If 
 
 **Location:**
 - `tests/unit/test_admin.py`, lines 49, 81, 103, 138
+  ![Duplicate mock setup — tests/unit/test_admin.py line 49](assets/violation_5a.png)
+  ![Duplicate mock setup — tests/unit/test_admin.py line 81](assets/violation_5b.png)
+  ![Duplicate mock setup — tests/unit/test_admin.py line 103](assets/violation_5c.png)
+  ![Duplicate mock setup — tests/unit/test_admin.py line 138](assets/violation_5d.png)
 
 **Explanation:**
 The same mock setup for `ClassResource` is copied identically into four different test functions. Instead of writing a shared helper or pytest fixture for this repeated setup, the block is duplicated four times across the file. If the import path of `ClassResource` changes, every one of these four lines must be updated manually. A shared pytest fixture would centralize this setup, making the tests more modular and easier to maintain when the production code changes.
@@ -615,6 +620,10 @@ Both ClassList.get() and EnrolledClasses.get() construct nearly identical dictio
 ### Code Smell 6 - Magic Strings
 
 **Location:** `tests/unit/test_admin.py`, lines 60, 86, 121, 143
+  ![Hardcoded URL — tests/unit/test_admin.py line 60](assets/code_smell_5a.png)
+  ![Hardcoded URL — tests/unit/test_admin.py line 86](assets/code_smell_5b.png)
+  ![Hardcoded URL — tests/unit/test_admin.py line 121](assets/code_smell_5c.png)
+  ![Hardcoded URL — tests/unit/test_admin.py line 143](assets/code_smell_5d.png)
 
 **Explanation:**
 The URL string `"/admin/class-1/members"` and the class ID `"class-1"` are hardcoded identically across four different test functions. If the URL structure changes, every one of those lines must be updated manually. Defining these as a named constant at the top of the file would mean a single change covers all four tests.
@@ -624,6 +633,7 @@ The URL string `"/admin/class-1/members"` and the class ID `"class-1"` are hardc
 ### Code Smell 7 - Long Method
 
 **Location:** `app/apis/admin.py`, `ClassMemberList.get()`, lines 160-194
+  ![ClassMemberList.get() full method — app/apis/admin.py lines 160–194](assets/code_smell_6.png)
 
 **Explanation:**
 The method is 34 lines long and performs five distinct jobs: checking the requester's role, looking up the class by ID, extracting the list of user IDs, fetching full user details, and formatting the response. This is a Long Method smell. Each of these steps could be extracted into a smaller, named helper so that each piece is easier to read, test, and change on its own. As it stands, any change to role checking, data fetching, or response formatting all touch the same method.
