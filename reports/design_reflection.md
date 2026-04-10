@@ -437,6 +437,8 @@ The entire notification pipeline is hardwired to a single delivery mechanism: AW
 
 This is a direct violation of OCP. A well-designed system would define a `NotificationService` abstraction (e.g., a protocol or abstract base class with a `send()` method), with `SESEmailNotifier` as one concrete implementation. The `SendClassReminder` handler would depend on the abstraction and new channels could be added without touching existing code. 
 
+---
+
 ### Violation 2 - Abstraction principle
 
 **Principle:** The design of a class makes clients understand what it does and how to use it without caring about details
@@ -477,6 +479,8 @@ The endpoint also performs authentication and input validation
 - Input validation: Line 80-126
 
 This violation is also repeated in other endpoints such as SendClassReminder, ClassMemberList
+
+---
 
 ### Violation 4 - Single Responsibility Principle (SRP) 
 **Principle:** A class or function should have only one reason to change.
@@ -556,12 +560,17 @@ create_class method has a long parameter list with 8 parameters
 ![CreateClass Endpoint — app/apis/admin.py lines 80-86](assets/code_smell_3.png)
 
 **Explanation:** class data is handled as many raw primitives (name, date_str, start_time, capacity, etc.) instead of a single typed request object, which makes validation and data flow scattered and error-prone.
-### Code Smell 2 - Long Method 
+
+---
+
+### Code Smell 4 - Long Method 
 Many lines of code in a method making it hard to understand.
 
 **Location:** 
 - `tests/unit/test_view_classlist.py`, `test_complete_workflow` lines 268-314
-(Screenshoot attached in code_smell2)
+
+![tests/unit/test_view_classlist.py](assets/code_smell2.png) 
+
 
 **Explanation:**
 This method is too long because it goes over 30+ lines of code. Since this is a test for overall workflow of the get class list method, it tests multiple things simultaneously. For instance it does:
@@ -571,7 +580,9 @@ This method is too long because it goes over 30+ lines of code. Since this is a 
 
 A client needs to understand the flow of the code and previous tests to know what is being tested, how and when. This makes the code hard to understand and maintain, hence, the code smell. To make the process simpler, the code should be extracted and broken down into smaller focused test methods.
 
-### Code Smell 4 — Duplicate Code
+---
+
+### Code Smell 5 — Duplicate Code
 
 **Location:** `app/apis/member.py`
 `ClassList.get()`, lines 104-114 , `EnrolledClasses.get()`, lines 175-186
@@ -585,7 +596,7 @@ Both ClassList.get() and EnrolledClasses.get() construct nearly identical dictio
 
 ---
 
-### Code Smell 5 - Magic Strings
+### Code Smell 6 - Magic Strings
 
 **Location:** `tests/unit/test_admin.py`, lines 60, 86, 121, 143
 
@@ -594,7 +605,7 @@ The URL string `"/admin/class-1/members"` and the class ID `"class-1"` are hardc
 
 ---
 
-### Code Smell 6 - Long Method
+### Code Smell 7 - Long Method
 
 **Location:** `app/apis/admin.py`, `ClassMemberList.get()`, lines 160-194
 
@@ -611,7 +622,7 @@ The method is 34 lines long and performs five distinct jobs: checking the reques
 
 - This feature will need us to add recurrence fields which will require to modify every API endpoint that works with class data. The current design we have has _abstraction and modularity issues_ which will make the extensibility and maintainability of the code difficult. Since API already knows field names, adding a new feature will need complete modification of these endpoints to include these fields. This will increase the risk of making errors that lead to more violations.
 
-- `ClassMemberList.get()` already performs five distinct jobs in 34 lines (_Code Smell 6 - Long Method_). Adding recurring class support, such as filtering or grouping the member list by recurrence, would extend this method further and make the Long Method smell significantly worse.
+- `ClassMemberList.get()` already performs five distinct jobs in 34 lines (_Code Smell 7 - Long Method_). Adding recurring class support, such as filtering or grouping the member list by recurrence, would extend this method further and make the Long Method smell significantly worse.
 
 ### Feature 7 — Configure Notifications
 
