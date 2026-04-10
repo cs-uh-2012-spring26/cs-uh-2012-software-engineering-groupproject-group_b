@@ -10,25 +10,40 @@ For Task 4, we used the violations and smells found in Tasks 2 and 3 as a basis 
 
 # Team member responsibilities
 
-Raissa: 
-- Created the class diagram to show mian classes and their associations
-- Added a design principle violation for task 2 
-- Added a code smell found in tests for task 3
-- Added reflection for the new features with reference to existing code design
-### Tools Used:
+Raissa:
+- Created the class diagram showing main classes and their associations (Task 1)
+- Identified Violation 2 (Abstraction) in `app/apis/member.py` (Task 2)
+- Identified Code Smell 2 (Long Method) in `tests/unit/test_view_classlist.py` (Task 3)
+- Added reflection on Feature 6 based on existing code design (Task 4)
 
-Visual Studio PyreverseSequence Plugin was used to make an initial sequence diagram for the send class reminder endpoint. This was then edited to incorporate missing lifelines and actors.
+Mustafa:
+- Created the sequence diagram for the Send Class Reminder endpoint using the Visual Studio PyReverseSequence Plugin, then manually refined it (Task 1)
+- Identified Violations 1 (OCP) and 2 (Modularity) in `app/email.py` and `app/apis/admin.py` (Task 2)
+- Identified Code Smells 1 (Duplicate Code) and 2 (Long Parameter List) in `app/db/users.py` and `app/db/classes.py` (Task 3)
+- Added reflection on Feature 7 based on existing code design (Task 4)
+
+Tinh:
+- Identified Violation 2 (Modularity) in `app/apis/admin.py` for Feature 1 (Task 2)
+- Identified Code Smells 2 (Primitive Obsession) and 3 for Feature 1 in `app/apis/admin.py` (Task 3)
+- Added reflection on Feature 7 based on existing code design (Task 4)
+
+Maryam:
+- Identified Violation 3 (SRP) in `app/apis/member.py` for Feature 3 (Task 2)
+- Identified Code Smell 4 (Duplicate Code) in `app/apis/member.py` for Feature 3 (Task 3)
+- Added reflection on Feature 6 based on existing code design (Task 4)
+- Created the sequence diagram for the Book endpoint 
 
 Uditi:
-- Added design principle violations in task 2 from Feature 4 implementation and tests
-- Added code smells found in Feature 4 tests and implementation for task 3
-- Added reflection points for task 4 based on findings in Feature 4 code
+- Reviewed and contributed to the Book a Class sequence diagram (Task 1)
+- Identified Violations 4 (OCP) and 5 (Modularity) in `app/apis/admin.py` and `tests/unit/test_admin.py` (Task 2)
+- Identified Code Smells 5 (Magic Strings) and 6 (Long Method) in `tests/unit/test_admin.py` and `app/apis/admin.py` (Task 3)
+- Added reflection on Feature 6 based on findings in Feature 4 code (Task 4)
 
 ## Task 1:
 
 ### Class Diagram - Show main classes and their associations
 
-# Using mermaid "
+```mermaid
 classDiagram
     direction TB
     
@@ -204,6 +219,7 @@ classDiagram
     Member --> ClassBooking : books
     Trainer --> CreateClass : creates
     Trainer --> SendClassReminder : sends
+```
 
 ### Sequence Diagram — Send Class Reminder Endpoint
 
