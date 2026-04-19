@@ -23,4 +23,8 @@ class Config(object):
     MOCK_DB = get_required_environ("MOCK_DB").lower() == "true"
     DEBUG = get_required_environ("DEBUG").lower() == "true"
     JWT_SECRET_KEY = get_required_environ("JWT_SECRET_KEY")
+    AWS_ACCESS_KEY_ID = get_required_environ("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = get_required_environ("AWS_SECRET_ACCESS_KEY")
+    AWS_SES_REGION = get_required_environ("AWS_SES_REGION")
+    SES_SENDER_EMAIL = get_required_environ("SES_SENDER_EMAIL")
 
