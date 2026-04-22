@@ -6,10 +6,12 @@ from flask_restx import Namespace, Resource, fields
 
 from app.apis import MSG
 from app.db.users import MEMBER_ROLE, TRAINER_ROLE, UserResource
+from app.services.registration import RegistrationTemplate
 
 VALID_ROLES = {MEMBER_ROLE, TRAINER_ROLE}
 
-api = Namespace("auth", description="Endpoints for user registration and authentication")
+api = Namespace(
+    "auth", description="Endpoints for user registration and authentication")
 
 # ---------------------------------------------------------------------------
 # Swagger / Flask-RESTX models
@@ -68,8 +70,14 @@ _REGISTER_OK_RESPONSE = api.model(
 # POST /users/register  — create a new member or trainer account
 # ---------------------------------------------------------------------------
 
+
 @api.route("/register")
 class Register(Resource):
+
+    def __init__(self, api=None):
+        super().__init__(api)
+        self.registration_template = RegistrationTemplate()
+
     @api.expect(_REGISTER_MODEL)
     @api.response(HTTPStatus.CREATED, "User registered successfully", _REGISTER_OK_RESPONSE)
     @api.response(HTTPStatus.BAD_REQUEST, "Missing or invalid fields", _ERROR_RESPONSE)
@@ -85,37 +93,14 @@ class Register(Resource):
         - At least one special character (!@#$%^&*()-_=+[]{}|;:,.<>?/\\)
         - No spaces or whitespace
         """
-        assert isinstance(request.json, dict)
+        # API now handles HTTP only
+        success, message, status_code, user_id = self.registration_template.register(
+            request.json)
 
-        name = request.json.get("name", "").strip()
-        email = request.json.get("email", "").strip()
-        password = request.json.get("password", "")
-        role = request.json.get("role", "").strip().lower()
-
-        if not name or not email or not password:
-            return (
-                {MSG: "name, email, and password are all required"},
-                HTTPStatus.BAD_REQUEST,
-            )
-
-        if role not in VALID_ROLES:
-            return (
-                {MSG: f"role must be one of: {', '.join(sorted(VALID_ROLES))}"},
-                HTTPStatus.BAD_REQUEST,
-            )
-
-        user_resource = UserResource()
-        user_id, error = user_resource.register_user(name, email, password, role)
-
-        if error is not None:
-            status = (
-                HTTPStatus.CONFLICT
-                if "already exists" in error
-                else HTTPStatus.BAD_REQUEST
-            )
-            return {MSG: error}, status
-
-        return {MSG: f"{role.capitalize()} registered with id: {user_id}"}, HTTPStatus.CREATED
+        if success:
+            return {MSG: f"{message} with id: {user_id}"}, status_code
+        else:
+            return {MSG: message}, status_code
 
 
 # ---------------------------------------------------------------------------
@@ -135,12 +120,9 @@ class Login(Resource):
 
         email = request.json.get("email", "").strip()
         password = request.json.get("password", "")
-   
 
         if not email or not password:
             return {MSG: "email and password are required"}, HTTPStatus.BAD_REQUEST
-
-       
 
         user_resource = UserResource()
         user, error = user_resource.authenticate_user(
@@ -149,7 +131,6 @@ class Login(Resource):
 
         if error is not None:
             return {MSG: error}, HTTPStatus.UNAUTHORIZED
-
 
         token = create_access_token(
             identity=user["_id"],
