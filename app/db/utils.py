@@ -40,3 +40,16 @@ def serialize_items(items):
         list: A list of serialized items.
     """
     return [serialize_item(item) for item in items]
+
+def serialize_class(class_doc: dict):
+    return {
+        "_id": serialize_oid(class_doc.get("_id")),
+        "name": class_doc.get("name"),
+        "description": class_doc.get("description"),
+        "trainer_name": class_doc.get("trainer_name"),
+        "date": class_doc.get("date"),
+        "start_time": class_doc.get("start_time"),
+        "end_time": class_doc.get("end_time"),
+        "room_number": class_doc.get("room_number"),
+        "capacity": class_doc.get("capacity"),
+    }

@@ -3,9 +3,9 @@ import re
 import bcrypt
 
 from app.db import DB
-from app.db.utils import serialize_item, serialize_items
+from app.db.utils import serialize_item, serialize_class
 from bson import ObjectId
-
+from app.db.classes import CLASS_COLLECTION
 # User collection name and fields
 USER_COLLECTION = "users"
 USER_NAME = "name"
@@ -72,6 +72,7 @@ def validate_password(password: str) -> tuple[bool, str]:
 class UserResource:
     def __init__(self):
         self.collection = DB.get_collection(USER_COLLECTION)
+        self.classes_collection = DB.get_collection(CLASS_COLLECTION)
 
     # ------------------------------------------------------------------
     # Query helpers
@@ -139,9 +140,9 @@ class UserResource:
         result = self.collection.insert_one(user)
         return result.inserted_id
 
-    def register_member(self, name: str, email: str, password: str):
+    def register_user(self, name: str, email: str, password: str, role: str):
         """
-        Register a new member account.
+        Register a new user account (member or trainer).
 
         - Validates the password against the password policy.
         - Rejects duplicate email addresses.
@@ -163,7 +164,7 @@ class UserResource:
         user = {
             USER_NAME: name,
             USER_EMAIL: email,
-            USER_ROLE: MEMBER_ROLE,
+            USER_ROLE: role,
             USER_PASSWORD_HASH: pw_hash,
             USER_CLASS_IDS: [],
         }
@@ -174,9 +175,9 @@ class UserResource:
     # Authentication
     # ------------------------------------------------------------------
 
-    def authenticate_user(self, email: str, password: str, required_role: str):
+    def authenticate_user(self, email: str, password: str):
         """
-        Authenticate a user by email + password, enforcing a required role.
+        Authenticate a user by email + password
 
         Returns a generic "Invalid email or password" message for both bad
         credentials and wrong role to avoid leaking account existence.
@@ -189,45 +190,18 @@ class UserResource:
 
         # Use a constant-time-safe path: always check password if user exists
         # to avoid timing attacks that reveal valid email addresses.
-        dummy_hash = "$2b$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        dummy_hash = "$2b$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
         stored_hash = (user or {}).get(USER_PASSWORD_HASH, dummy_hash)
-        password_ok = bcrypt.checkpw(password.encode(), stored_hash.encode())
+        try:
+            password_ok = bcrypt.checkpw(password.encode(), stored_hash.encode())
+        except (ValueError, TypeError):
+            password_ok = False
 
-        if user is None or user.get(USER_ROLE) != required_role or not password_ok:
+        if user is None or not password_ok:
             return None, "Invalid email or password"
 
         return serialize_item(user), None
-
-    def register_trainer(self, name: str, email: str, password: str):
-        """
-        Register a new trainer account.
-
-        Same password policy as members. Only callable by an existing trainer
-        (enforced at the API layer).
-
-        Returns:
-            (str inserted_id, None)      – success
-            (None, str error_message)    – failure
-        """
-        valid, reason = validate_password(password)
-        if not valid:
-            return None, reason
-
-        if self.get_user_by_email(email) is not None:
-            return None, "A user with that email already exists"
-
-        pw_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-
-        user = {
-            USER_NAME: name,
-            USER_EMAIL: email,
-            USER_ROLE: TRAINER_ROLE,
-            USER_PASSWORD_HASH: pw_hash,
-            USER_CLASS_IDS: [],
-        }
-        result = self.collection.insert_one(user)
-        return str(result.inserted_id), None
 
     # ------------------------------------------------------------------
     # Class enrollment
@@ -261,3 +235,20 @@ class UserResource:
             {"$addToSet": {USER_CLASS_IDS: class_oid}},
         )
         return result.matched_count == 1
+    
+    def get_classes_by_user_id(self, user_id: str)->list[dict]:
+        """
+        Fetch all classes for a user by their ObjectId.
+        Returns a list of serialized class dicts.
+        """
+        user_oid = ObjectId(user_id)
+        user = self.collection.find_one({"_id": user_oid})
+        if user is None:
+            return []
+
+        class_ids = user.get(USER_CLASS_IDS, [])
+        if not class_ids:
+            return []
+
+        classes = self.classes_collection.find({"_id": {"$in": class_ids}})
+        return [serialize_class(class_doc) for class_doc in classes]
