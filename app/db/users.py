@@ -3,7 +3,7 @@ import re
 import bcrypt
 
 from app.db import DB
-from app.db.utils import serialize_item, serialize_class
+from app.db.utils import serialize_item, serialize_items, serialize_class
 from bson import ObjectId
 from app.db.classes import CLASS_COLLECTION
 # User collection name and fields
@@ -14,6 +14,8 @@ USER_ROLE = "role"
 USER_CONTACT = "contact"
 USER_PASSWORD_HASH = "password_hash"
 USER_CLASS_IDS = "class_ids"
+USER_NOTIFICATION_PREFS = "notification_prefs"
+USER_TELEGRAM_CHAT_ID   = "telegram_chat_id"
 
 # Role constants
 MEMBER_ROLE = "member"
@@ -207,12 +209,13 @@ class UserResource:
     # Class enrollment
     # ------------------------------------------------------------------
 
-    def get_users_by_ids(self, user_oids: list) -> list:
+    def get_users_by_ids(self, user_ids: list) -> list:
         """
-        Fetch multiple users by a list of ObjectIds (not strings).
+        Fetch multiple users by a list of user IDs (strings or ObjectIds).
         Returns a list of serialized user dicts.
         """
-        users = self.collection.find({"_id": {"$in": user_oids}})
+        oids = [ObjectId(uid) if not isinstance(uid, ObjectId) else uid for uid in user_ids]
+        users = self.collection.find({"_id": {"$in": oids}})
         return serialize_items(list(users))
 
     def add_class_to_user(self, user_id: str, class_id: str):
@@ -252,3 +255,32 @@ class UserResource:
 
         classes = self.classes_collection.find({"_id": {"$in": class_ids}})
         return [serialize_class(class_doc) for class_doc in classes]
+
+    def update_notification_settings(
+        self,
+        user_id: str,
+        notification_prefs: dict | None = None,
+        telegram_chat_id: str | None = None,
+    ) -> tuple[bool, str]:
+        """
+        Partial update — only fields explicitly passed (non-None) are written.
+        Existing saved values are left untouched if not included in the call.
+        """
+        try:
+            user_oid = ObjectId(user_id)
+        except Exception:
+            return False, "Invalid user ID"
+
+        set_fields: dict = {}
+        if notification_prefs is not None:
+            set_fields[USER_NOTIFICATION_PREFS] = notification_prefs
+        if telegram_chat_id is not None:
+            set_fields[USER_TELEGRAM_CHAT_ID] = telegram_chat_id
+
+        if not set_fields:
+            return False, "No fields to update"
+
+        result = self.collection.update_one({"_id": user_oid}, {"$set": set_fields})
+        if result.matched_count == 0:
+            return False, "User not found"
+        return True, ""

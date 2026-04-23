@@ -40,6 +40,7 @@ AWS_ACCESS_KEY_ID="your-obtained-access-key"
 AWS_SECRET_ACCESS_KEY="your-obtained-secret-key"
 AWS_SES_REGION="eu-central-1"
 SES_SENDER_EMAIL="your-sender-email"
+TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
 ```
 
 > **Note:** Set `JWT_SECRET_KEY` to any long random string. Keep it secret — it signs all JWT tokens.
@@ -59,6 +60,33 @@ To run and test the reminder email feature, configure Amazon SES and IAM, then f
 9. Copy those credentials into `.env` as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
 
 > **Reminder:** If emails fail in sandbox mode, the most common reason is that either the sender or one of the recipient addresses is not verified in SES.
+
+### 2.2: Telegram Bot Setup for Telegram Reminder Notifications (Feature 7)
+
+To enable Telegram reminders, you need to create a Telegram bot and obtain its token.
+
+1. Open Telegram and search for **@BotFather**.
+2. Start a chat with it and send the command `/newbot`.
+3. Follow the prompts: enter a display name (e.g. `FitClass Reminders`) then a username ending in `bot` (e.g. `fitclass_remind_bot`).
+4. BotFather will reply with an API token that looks like `123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`.
+5. Copy this token and set it in your `.env` file:
+   ```env
+   TELEGRAM_BOT_TOKEN="your-token-here"
+   ```
+6. **Start the bot** — Search for your bot by its username in Telegram and tap **Start** (or send `/start`). This is required — bots cannot message users who have never contacted them first.
+7. **Find your Chat ID** — Your Telegram Chat ID is a unique numeric identifier for your account. The easiest way to find it:
+   - Open Telegram and search for **@userinfobot**.
+   - Start a chat and send any message.
+   - It will reply with your numeric Chat ID (e.g. `123456789`).
+8. **Save your Chat ID** — Submit it to the API using `PUT /users/me/notifications`:
+   ```json
+   {
+     "telegram_chat_id": "123456789",
+     "notification_prefs": { "telegram": true }
+   }
+   ```
+
+> **Note:** If a member has not started the bot, Telegram will reject the message and the reminder will appear in the `failed` list in the API response.
 
 ### 3. Create the virtual environment and install dependencies
 

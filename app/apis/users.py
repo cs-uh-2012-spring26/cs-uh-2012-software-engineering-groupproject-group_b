@@ -1,14 +1,18 @@
 from http import HTTPStatus
 
 from bson import ObjectId
+from flask import request
 from flask_jwt_extended import get_jwt_identity
 from flask_restx import Namespace, Resource, fields
 
 from app.apis import MSG
 from app.db.classes import ClassResource
-from app.db.users import UserResource
+from app.db.users import (
+    USER_NOTIFICATION_PREFS,
+    USER_TELEGRAM_CHAT_ID,
+    UserResource,
+)
 from app.services.auth import member_required
-from app.services.email import send_class_reminder
 
 api = Namespace("users", description="Endpoints for users")
 
@@ -22,7 +26,7 @@ _ERROR_RESPONSE = api.model(
 )
 
 # ---------------------------------------------------------------------------
-# POST /classes/<class_id>/book — book a class
+# POST /users/me/book/<class_id> — book a class
 # ---------------------------------------------------------------------------
 
 _BOOK_OK_RESPONSE = api.model(
@@ -31,7 +35,7 @@ _BOOK_OK_RESPONSE = api.model(
 )
 
 # ---------------------------------------------------------------------------
-# GET /classes/<class_id>/book — enrolled classes for current member
+# GET /users/me/book — enrolled classes for current member
 # ---------------------------------------------------------------------------
 
 _ENROLLED_CLASS = api.model(
@@ -49,13 +53,39 @@ _ENROLLED_CLASS = api.model(
     },
 )
 
+# ---------------------------------------------------------------------------
+# PUT /users/me/notifications — update notification preferences
+# ---------------------------------------------------------------------------
+
+_NOTIFICATION_PREFS_MODEL = api.model(
+    "NotificationPrefs",
+    {
+        "email":    fields.Boolean(description="Receive email reminders",    example=True),
+        "telegram": fields.Boolean(description="Receive Telegram reminders", example=False),
+    },
+)
+
+_UPDATE_NOTIFICATIONS_MODEL = api.model(
+    "UpdateNotifications",
+    {
+        "notification_prefs": fields.Nested(
+            _NOTIFICATION_PREFS_MODEL,
+            description="Per-channel opt-in flags (all optional)",
+        ),
+        "telegram_chat_id": fields.String(
+            description="Telegram numeric chat ID (message @userinfobot to find yours)",
+            example="123456789",
+        ),
+    },
+)
+
+_UPDATE_NOTIFICATIONS_OK = api.model(
+    "UpdateNotificationsOK",
+    {MSG: fields.String(example="Notification preferences updated")},
+)
 
 # =========================================================================
-# /classes/<class_id>/remind
-# =========================================================================
-
-# =========================================================================
-# /classes/<class_id>/book
+# /users/me/book/<class_id>
 # =========================================================================
 
 
@@ -95,9 +125,14 @@ class ClassBooking(Resource):
         return {MSG: "Booked successfully"}, HTTPStatus.OK
 
 
+# =========================================================================
+# /users/me/book
+# =========================================================================
+
 
 @api.route("/me/book")
 class UserEnrolledClasses(Resource):
+
     @member_required
     @api.doc(security="Bearer")
     @api.response(HTTPStatus.OK, "Enrolled classes returned", [_ENROLLED_CLASS])
@@ -118,5 +153,56 @@ class UserEnrolledClasses(Resource):
         user_resource = UserResource()
         enrolled_classes = user_resource.get_classes_by_user_id(current_user_id)
 
-
         return enrolled_classes
+
+
+# =========================================================================
+# /users/me/notifications
+# =========================================================================
+
+
+@api.route("/me/notifications")
+class MemberNotificationPrefs(Resource):
+
+    @member_required
+    @api.doc(security="Bearer")
+    @api.expect(_UPDATE_NOTIFICATIONS_MODEL)
+    @api.response(HTTPStatus.OK, "Preferences updated", _UPDATE_NOTIFICATIONS_OK)
+    @api.response(HTTPStatus.BAD_REQUEST, "No valid fields supplied", _ERROR_RESPONSE)
+    @api.response(HTTPStatus.NOT_FOUND, "User not found", _ERROR_RESPONSE)
+    @api.response(HTTPStatus.UNAUTHORIZED, "JWT required", _ERROR_RESPONSE)
+    def put(self):
+        """Update notification preferences and/or contact details for the current member."""
+        user_id = get_jwt_identity()
+        data    = request.json or {}
+
+        raw_prefs        = data.get("notification_prefs")
+        telegram_chat_id = data.get("telegram_chat_id")
+
+        if raw_prefs is None and telegram_chat_id is None:
+            return (
+                {MSG: "Supply at least one of: notification_prefs, telegram_chat_id"},
+                HTTPStatus.BAD_REQUEST,
+            )
+
+        sanitized_prefs = None
+        if raw_prefs is not None:
+            known_keys = {"email", "telegram"}
+            sanitized_prefs = {k: bool(v) for k, v in raw_prefs.items() if k in known_keys}
+            if not sanitized_prefs:
+                return (
+                    {MSG: "notification_prefs must contain at least one of: email, telegram"},
+                    HTTPStatus.BAD_REQUEST,
+                )
+
+        user_resource = UserResource()
+        ok, err = user_resource.update_notification_settings(
+            user_id=user_id,
+            notification_prefs=sanitized_prefs,
+            telegram_chat_id=telegram_chat_id,
+        )
+        if not ok:
+            status = HTTPStatus.NOT_FOUND if "not found" in err else HTTPStatus.BAD_REQUEST
+            return {MSG: err}, status
+
+        return {MSG: "Notification preferences updated"}, HTTPStatus.OK
