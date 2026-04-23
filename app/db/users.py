@@ -256,31 +256,24 @@ class UserResource:
         classes = self.classes_collection.find({"_id": {"$in": class_ids}})
         return [serialize_class(class_doc) for class_doc in classes]
 
-    def update_notification_settings(
+    def update_notification_prefs(
         self,
         user_id: str,
-        notification_prefs: dict | None = None,
-        telegram_chat_id: str | None = None,
+        update_fields: dict,
     ) -> tuple[bool, str]:
         """
-        Partial update — only fields explicitly passed (non-None) are written.
-        Existing saved values are left untouched if not included in the call.
+        Partial update — applies $set with whatever fields the caller passes.
+        Building update_fields is the caller's responsibility.
         """
         try:
             user_oid = ObjectId(user_id)
         except Exception:
             return False, "Invalid user ID"
 
-        set_fields: dict = {}
-        if notification_prefs is not None:
-            set_fields[USER_NOTIFICATION_PREFS] = notification_prefs
-        if telegram_chat_id is not None:
-            set_fields[USER_TELEGRAM_CHAT_ID] = telegram_chat_id
-
-        if not set_fields:
+        if not update_fields:
             return False, "No fields to update"
 
-        result = self.collection.update_one({"_id": user_oid}, {"$set": set_fields})
+        result = self.collection.update_one({"_id": user_oid}, {"$set": update_fields})
         if result.matched_count == 0:
             return False, "User not found"
         return True, ""

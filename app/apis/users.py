@@ -73,7 +73,7 @@ _UPDATE_NOTIFICATIONS_MODEL = api.model(
             description="Per-channel opt-in flags (all optional)",
         ),
         "telegram_chat_id": fields.String(
-            description="Telegram numeric chat ID (message @userinfobot to find yours)",
+            description="Telegram numeric chat ID — required when enabling Telegram (message @userinfobot to find yours)",
             example="123456789",
         ),
     },
@@ -176,31 +176,30 @@ class MemberNotificationPrefs(Resource):
         user_id = get_jwt_identity()
         data    = request.json or {}
 
-        raw_prefs        = data.get("notification_prefs")
-        telegram_chat_id = data.get("telegram_chat_id")
-
-        if raw_prefs is None and telegram_chat_id is None:
+        channels = {
+            k: bool(v)
+            for k, v in data.get("notification_prefs", {}).items()
+            if k in {"email", "telegram"}
+        }
+        if not channels:
             return (
-                {MSG: "Supply at least one of: notification_prefs, telegram_chat_id"},
+                {MSG: "notification_prefs must include at least one of: email, telegram"},
                 HTTPStatus.BAD_REQUEST,
             )
 
-        sanitized_prefs = None
-        if raw_prefs is not None:
-            known_keys = {"email", "telegram"}
-            sanitized_prefs = {k: bool(v) for k, v in raw_prefs.items() if k in known_keys}
-            if not sanitized_prefs:
+        update_fields = {USER_NOTIFICATION_PREFS: channels}
+
+        if channels.get("telegram"):
+            telegram_chat_id = (data.get("telegram_chat_id") or "").strip()
+            if not telegram_chat_id:
                 return (
-                    {MSG: "notification_prefs must contain at least one of: email, telegram"},
+                    {MSG: "telegram_chat_id is required when enabling Telegram"},
                     HTTPStatus.BAD_REQUEST,
                 )
+            update_fields[USER_TELEGRAM_CHAT_ID] = telegram_chat_id
 
         user_resource = UserResource()
-        ok, err = user_resource.update_notification_settings(
-            user_id=user_id,
-            notification_prefs=sanitized_prefs,
-            telegram_chat_id=telegram_chat_id,
-        )
+        ok, err = user_resource.update_notification_prefs(user_id, update_fields)
         if not ok:
             status = HTTPStatus.NOT_FOUND if "not found" in err else HTTPStatus.BAD_REQUEST
             return {MSG: err}, status
