@@ -21,8 +21,8 @@ from app.db.classes import (
 )
 from app.db.users import UserResource
 
-from app.services.email import send_class_reminder
 from app.services.auth import trainer_required
+from app.services.notifications.dispatcher import NotificationDispatcher
 
 api = Namespace("classes", description="Endpoints for classes")
 
@@ -101,16 +101,16 @@ _MEMBER_ITEM = api.model(
     {
         "name": fields.String(description="Member's full name"),
         "email": fields.String(description="Member's email address"),
-        "contact": fields.String(description="Member's contact number"),
+        "telegram_chat_id": fields.String(description="Member's Telegram chat ID"),
     },
 )
 
 
-_FAILED_EMAIL = api.model(
-    "FailedEmail",
+_FAILED_NOTIFICATION = api.model(
+    "FailedNotification",
     {
-        "email": fields.String(description="Recipient email address"),
-        "error": fields.String(description="SES error message"),
+        "member": fields.String(description="Member email"),
+        "errors": fields.List(fields.String(), description="Per-channel error messages"),
     },
 )
 
@@ -118,8 +118,11 @@ _REMINDER_RESPONSE = api.model(
     "ReminderResponse",
     {
         MSG: fields.String(description="Summary of reminder sending"),
-        "sent_to": fields.List(fields.String(), description="Emails successfully sent"),
-        "failed": fields.List(fields.Nested(_FAILED_EMAIL), description="Emails that failed"),
+        "sent_to": fields.List(fields.String(), description="Emails of members fully notified"),
+        "failed": fields.List(
+            fields.Nested(_FAILED_NOTIFICATION),
+            description="Members with at least one channel failure",
+        ),
     },
 )
 
@@ -205,6 +208,9 @@ class ClassList(Resource):
         """Get all upcoming classes."""
         class_resource = ClassResource()
         classes = class_resource.get_all_upcoming_classes()
+        for c in classes:
+            c.pop("trainer_id", None)
+            c.pop("user_ids", None)
         return {MSG: "All upcoming classes", "classes": classes}, HTTPStatus.OK
 
 
@@ -241,7 +247,7 @@ class ClassDetail(Resource):
             {
                 "name": m.get("name", ""),
                 "email": m.get("email", ""),
-                "contact": m.get("contact", ""),
+                "telegram_chat_id": m.get("telegram_chat_id"),
             }
             for m in members
         ]
@@ -285,23 +291,19 @@ class SendClassReminder(Resource):
 
         members = user_resource.get_users_by_ids(user_oids)
 
-        successes = []
-        failures = []
+        dispatcher = NotificationDispatcher()
+        successes: list[str] = []
+        failures:  list[dict] = []
+
         for member in members:
-            email = member.get("email", "")
-            name = member.get("name", "")
-            ok, err = send_class_reminder(
-                member_email=email,
-                member_name=name,
-                class_info=fitness_class,
-            )
-            if ok:
-                successes.append(email)
+            all_ok, errors = dispatcher.dispatch_to_member(member, fitness_class)
+            if all_ok:
+                successes.append(member.get("email", ""))
             else:
-                failures.append({"email": email, "error": err})
+                failures.append({"member": member.get("email", ""), "errors": errors})
 
         return {
-            MSG: f"Reminders processed: {len(successes)} sent, {len(failures)} failed",
+            MSG: f"Reminders processed: {len(successes)} sent, {len(failures)} with failures",
             "sent_to": successes,
-            "failed": failures,
+            "failed":  failures,
         }, HTTPStatus.OK
