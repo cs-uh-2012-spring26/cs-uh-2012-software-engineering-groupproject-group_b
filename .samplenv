@@ -29,3 +29,8 @@ AWS_SECRET_ACCESS_KEY="your-obtained-secret-key"
 AWS_SES_REGION="eu-central-1"
 # The verified sender email address in your SES account
 SES_SENDER_EMAIL="your-sender-email"
+
+# Telegram Bot — required for Telegram reminders (Feature 7)
+# Create a bot via @BotFather on Telegram, then paste the token here
+TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
+

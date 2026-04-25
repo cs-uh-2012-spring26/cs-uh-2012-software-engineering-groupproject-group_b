@@ -21,10 +21,8 @@ from app.db.classes import (
 )
 from app.db.users import UserResource
 
-from app.services.email_strategy import Emailstrategy
-from app.services.class_creation import Classcreation
-from app.services.member_access import MemberAccess
 from app.services.auth import trainer_required
+from app.services.notifications.dispatcher import NotificationDispatcher
 
 api = Namespace("classes", description="Endpoints for classes")
 
@@ -103,16 +101,16 @@ _MEMBER_ITEM = api.model(
     {
         "name": fields.String(description="Member's full name"),
         "email": fields.String(description="Member's email address"),
-        "contact": fields.String(description="Member's contact number"),
+        "telegram_chat_id": fields.String(description="Member's Telegram chat ID"),
     },
 )
 
 
-_FAILED_EMAIL = api.model(
-    "FailedEmail",
+_FAILED_NOTIFICATION = api.model(
+    "FailedNotification",
     {
-        "email": fields.String(description="Recipient email address"),
-        "error": fields.String(description="SES error message"),
+        "member": fields.String(description="Member email"),
+        "errors": fields.List(fields.String(), description="Per-channel error messages"),
     },
 )
 
@@ -120,8 +118,11 @@ _REMINDER_RESPONSE = api.model(
     "ReminderResponse",
     {
         MSG: fields.String(description="Summary of reminder sending"),
-        "sent_to": fields.List(fields.String(), description="Emails successfully sent"),
-        "failed": fields.List(fields.Nested(_FAILED_EMAIL), description="Emails that failed"),
+        "sent_to": fields.List(fields.String(), description="Emails of members fully notified"),
+        "failed": fields.List(
+            fields.Nested(_FAILED_NOTIFICATION),
+            description="Members with at least one channel failure",
+        ),
     },
 )
 
@@ -161,6 +162,9 @@ class ClassList(Resource):
         """Get all upcoming classes."""
         class_resource = ClassResource()
         classes = class_resource.get_all_upcoming_classes()
+        for c in classes:
+            c.pop("trainer_id", None)
+            c.pop("user_ids", None)
         return {MSG: "All upcoming classes", "classes": classes}, HTTPStatus.OK
 
 
@@ -186,12 +190,26 @@ class ClassDetail(Resource):
     @api.response(HTTPStatus.FORBIDDEN, "Trainer access required", _ERROR_RESPONSE)
     def get(self, class_id):
         """View the list of members enrolled in a class (trainer only)."""
+        class_resource = ClassResource()
+        fitness_class = class_resource.get_class_by_id(class_id)
+        if fitness_class is None:
+            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
 
-        members, error = self.member_access.get_enrolled_members(class_id)
+        user_oids = fitness_class.get("user_ids", [])
+        if not user_oids:
+            return []
 
-        if error:
-            return {MSG: error}, HTTPStatus.NOT_FOUND
-        return members, HTTPStatus.OK
+        user_resource = UserResource()
+        members = user_resource.get_users_by_ids(user_oids)
+
+        return [
+            {
+                "name": m.get("name", ""),
+                "email": m.get("email", ""),
+                "telegram_chat_id": m.get("telegram_chat_id"),
+            }
+            for m in members
+        ]
 
 # =========================================================================
 # /classes/<class_id>/remind
@@ -241,21 +259,29 @@ class SendClassReminder(Resource):
         if fitness_class.get(CLASS_TRAINER_ID) != trainer_identity:
             return {MSG: "You are not the trainer assigned to this class"}, HTTPStatus.FORBIDDEN
 
-        successes = []
-        failures = []
-        for member in members:
-            email = member.get("email", "")
-            name = member.get("name", "")
-            ok, err = self.email_strategy.send_reminder(
-                email, name, fitness_class)
+        user_resource = UserResource()
 
-            if ok:
-                successes.append(email)
+        user_oids = fitness_class.get("user_ids", [])
+        if not user_oids:
+            return {MSG: "No members enrolled in this class", "sent_to": [], "failed": []}, HTTPStatus.OK
+
+        members = user_resource.get_users_by_ids(user_oids)
+
+        dispatcher = NotificationDispatcher()
+        successes: list[str] = []
+        failures:  list[dict] = []
+
+        for member in members:
+            all_ok, errors = dispatcher.dispatch_to_member(
+                member, fitness_class)
+            if all_ok:
+                successes.append(member.get("email", ""))
             else:
-                failures.append({"email": email, "error": err})
+                failures.append(
+                    {"member": member.get("email", ""), "errors": errors})
 
         return {
-            MSG: f"Reminders processed: {len(successes)} sent, {len(failures)} failed",
+            MSG: f"Reminders processed: {len(successes)} sent, {len(failures)} with failures",
             "sent_to": successes,
-            "failed": failures,
+            "failed":  failures,
         }, HTTPStatus.OK

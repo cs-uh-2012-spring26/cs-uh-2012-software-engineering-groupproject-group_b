@@ -383,9 +383,71 @@ A6: Some emails fail to send
 
 - At step 6, if one or more emails are rejected by SES, those failures are recorded. The system continues sending to all remaining members and includes both successes and failures in the final response.
 
+A7: Class has already ended
+
+- At step 4, if the class's date and start time have already passed, the system rejects the request with a 400 Bad Request response indicating that reminders cannot be sent for a class that has already taken place.
+
 **Success Guarantee / Postconditions**
 
 1. A reminder email containing all class details is sent to every enrolled member.
 2. The system returns a summary of successfully delivered emails and any failures.
 3. No class or user data is modified as a result of this request.
 4. Only the trainer assigned to the class can trigger reminder emails for that class.
+
+---
+
+## Feature 7: Configure Notifications
+
+**User story: As someone registered in a fitness class, I want to choose how I receive reminders (e.g. email and/or Telegram), so I can stay informed in the ways that suit me.**
+
+**Use Case Name:** Configure Notification Preferences
+
+**Preconditions**
+
+1. The member is authenticated with a valid JWT token.
+2. The member's account has the role of "member".
+3. The server has been configured with credentials for all supported notification channels (Amazon SES for email, Telegram Bot API for Telegram).
+
+**Main Success Scenario**
+
+1. The member sends a PUT request to the notification preferences endpoint, providing their JWT token and a `notification_prefs` object indicating which channels to enable or disable (e.g. `{"email": true, "telegram": true}`).
+2. The system validates the JWT token and confirms the requester's role is "member".
+3. The system sanitizes the request, retaining only recognised channel keys.
+4. If Telegram is being enabled, the member also provides their `telegram_chat_id` in the request body. The system validates this field is present and non-empty.
+5. The system builds an update containing the notification preferences and any required channel-specific fields (e.g. `telegram_chat_id`) and writes them to the member's user record.
+6. The system returns a 200 OK response confirming the preferences have been updated.
+7. On the next trainer-triggered reminder for an enrolled class, the system delivers notifications to the member on every channel they have enabled.
+
+**Alternative Flows/Extensions**
+
+A1: Missing or invalid JWT token
+
+- At step 2, if no token is provided or the token is invalid/expired, the system rejects the request with a 401 Unauthorized response.
+
+A2: Insufficient role
+
+- At step 2, if the requester's role is not "member", the system rejects the request with a 403 Forbidden response.
+
+A3: No valid channels provided
+
+- At step 3, if `notification_prefs` is absent or contains no recognised channel keys, the system rejects the request with a 400 Bad Request response.
+
+A4: Telegram enabled but no Telegram Chat ID provided
+
+- At step 4, if `telegram` is set to true but no `telegram_chat_id` is included in the request, the system rejects the request with a 400 Bad Request response indicating that a `telegram_chat_id` is required when enabling Telegram.
+
+A5: Member has not started the Telegram bot
+
+- At step 7, if the member has not previously sent a message to the Telegram bot, the Telegram API will reject the outbound message. The reminder delivery for that channel is recorded as a failure and included in the trainer's reminder response, while other enabled channels are unaffected.
+
+A6: Notification channel delivery failure
+
+- At step 7, if delivery fails on one or more channels (e.g. SES rejects the email, or the Telegram API returns an error), the system records the failure for that channel, continues attempting delivery on any remaining enabled channels, and includes a per-channel breakdown in the trainer's reminder response.
+
+**Success Guarantee / Postconditions**
+
+1. The member's notification preferences are persisted in the database.
+2. Any required channel-specific contact details (e.g. `telegram_chat_id`) are stored alongside the preferences.
+3. Future reminder sends for classes the member is enrolled in will deliver notifications only via the channels the member has enabled.
+4. If a member has disabled all channels, they receive no reminders when a trainer triggers the remind endpoint.
+5. No class data is modified as a result of this request.
