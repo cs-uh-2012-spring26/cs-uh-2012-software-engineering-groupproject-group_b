@@ -50,4 +50,6 @@ def mock_jwt(mocker):
             return_value=None
         )
         mocker.patch("flask_jwt_extended.get_jwt", return_value={"role": role})
+        mocker.patch("flask_jwt_extended.get_jwt_identity",
+                     return_value="test_trainer_id")
     return setup
