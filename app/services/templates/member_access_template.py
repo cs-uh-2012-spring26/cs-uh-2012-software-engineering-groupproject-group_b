@@ -2,22 +2,37 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Tuple, Optional
 
 
-class MemberTemplate(ABC):
-    """ Template for accessonh enorlled members """
+class MemberAccessTemplate(ABC):
+    """ Template for access of enrolled members """
 
     def get_enrolled_members(self, class_id: str) -> Tuple[Optional[List[Dict]], Optional[str]]:
 
         # Find class
-        fitness_class = self._find_class(class_id)
+        fitness_class = self.find_class(class_id)
         if not fitness_class:
             return None, "Class not found"
 
-        member_ids = self._extract_member_ids(fitness_class)
+        member_ids = self.extract_member_ids(fitness_class)
         if not member_ids:
             return [], None
         # Fetch members
-        members = self._fetch_members(member_ids)
-        return self._format_members(members), None
+        members = self.fetch_members(member_ids)
+        return self.format_members(members), None
+
+    def get_enrolled_members_with_class(self, class_id: str) -> Tuple[Optional[List[Dict]], Optional[Dict], Optional[str]]:
+
+        # Find class
+        fitness_class = self.find_class(class_id)
+        if not fitness_class:
+            return None, None, "Class not found"
+
+        member_ids = self.extract_member_ids(fitness_class)
+        if not member_ids:
+            return [], fitness_class, None
+        # Fetch members
+        members = self.fetch_members(member_ids)
+        # fprmat response
+        return self.format_members(members), None
 
     @abstractmethod
     def find_class(self, class_id: str) -> Optional[Dict]:

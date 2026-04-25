@@ -1,10 +1,10 @@
-from app.services.auth_template import RegistrationTemplate
+from app.services.templates.auth_template import RegistrationTemplate
 from app.db.users import UserResource
 from typing import Optional
 import re
 
 
-class registration(RegistrationTemplate):
+class Registration(RegistrationTemplate):
 
     """Register a new member or trainer account.
 
@@ -27,7 +27,7 @@ class registration(RegistrationTemplate):
             return "Password can't contain spaces"
         if not re.search(r'[a-z]', password):
             return "Password must contain atleast one lowercase letter"
-        if not re.search(r'[A-Z]'):
+        if not re.search(r'[A-Z]', password):
             return "Password must contain atleast one uppercase letter"
         if not re.search(r'\d', password):
             return "Password must contain atleast one digit"

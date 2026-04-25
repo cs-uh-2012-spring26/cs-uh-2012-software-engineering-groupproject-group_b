@@ -1,4 +1,3 @@
-from datetime import datetime
 from http import HTTPStatus
 
 from flask import request
@@ -20,9 +19,11 @@ from app.db.classes import (
     ClassResource,
 )
 from app.db.users import UserResource
-
-from app.services.auth import trainer_required
+from app.services.notifications.email_service import EmailService
 from app.services.notifications.dispatcher import NotificationDispatcher
+from app.services.auth import trainer_required
+from app.services.templates.standard_class_creation import StandardClassCreation
+from app.services.templates.standard_member_access import StandardMemberAccess
 
 api = Namespace("classes", description="Endpoints for classes")
 
@@ -138,7 +139,7 @@ class ClassList(Resource):
 
     def __init__(self, api=None):
         super().__init__(api)
-        self.class_template = Classcreation()
+        self.class_template = StandardClassCreation()
 
     @trainer_required
     @api.doc(security="Bearer")
@@ -180,7 +181,7 @@ class ClassDetail(Resource):
 
     def __init__(self, api=None):
         super().__init__(api)
-        self.class_template = MemberAccess()
+        self.class_template = StandardMemberAccess()
 
     @trainer_required
     @api.doc(security="Bearer")
@@ -190,26 +191,14 @@ class ClassDetail(Resource):
     @api.response(HTTPStatus.FORBIDDEN, "Trainer access required", _ERROR_RESPONSE)
     def get(self, class_id):
         """View the list of members enrolled in a class (trainer only)."""
-        class_resource = ClassResource()
-        fitness_class = class_resource.get_class_by_id(class_id)
-        if fitness_class is None:
-            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
+        members, error = self.member_access.get_enrolled_members(class_id)
+        if error:
+            return {MSG: error}, HTTPStatus.NOT_FOUND
 
-        user_oids = fitness_class.get("user_ids", [])
-        if not user_oids:
+        if not members:
             return []
 
-        user_resource = UserResource()
-        members = user_resource.get_users_by_ids(user_oids)
-
-        return [
-            {
-                "name": m.get("name", ""),
-                "email": m.get("email", ""),
-                "telegram_chat_id": m.get("telegram_chat_id"),
-            }
-            for m in members
-        ]
+        return members
 
 # =========================================================================
 # /classes/<class_id>/remind
@@ -224,8 +213,7 @@ class SendClassReminder(Resource):
 
     def __init__(self, api=None):
         super().__init__(api)
-        self.email_strategy = Emailstrategy()
-        self.member_access = MemberAccess()
+        self.member_access = StandardMemberAccess()
 
     @trainer_required
     @api.doc(security="Bearer")
@@ -240,8 +228,8 @@ class SendClassReminder(Resource):
         In SES sandbox mode, each recipient email must be individually verified
         in the AWS SES console before emails can be delivered.
         """
-
-        members, error = self.member_access.get_enroled_members(class_id)
+        members, fitness_class, error = self.member_access.get_enrolled_members_with_class(
+            class_id)
 
         if error:
             return {MSG: error}, HTTPStatus.NOT_FOUND
@@ -250,23 +238,12 @@ class SendClassReminder(Resource):
             return {MSG: "No members enrolled", "sent_to": [], "failed": []}, HTTPStatus.OK
 
         # Verify that trainer owns the class
-        class_resource = ClassResource()
-        fitness_class = class_resource.get_class_by_id(class_id)
-        if fitness_class is None:
-            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
 
         trainer_identity = get_jwt_identity()
         if fitness_class.get(CLASS_TRAINER_ID) != trainer_identity:
             return {MSG: "You are not the trainer assigned to this class"}, HTTPStatus.FORBIDDEN
 
-        user_resource = UserResource()
-
-        user_oids = fitness_class.get("user_ids", [])
-        if not user_oids:
-            return {MSG: "No members enrolled in this class", "sent_to": [], "failed": []}, HTTPStatus.OK
-
-        members = user_resource.get_users_by_ids(user_oids)
-
+        # dispatch notification
         dispatcher = NotificationDispatcher()
         successes: list[str] = []
         failures:  list[dict] = []

@@ -3,26 +3,26 @@ from datetime import datetime
 from typing import Dict, Tuple, Optional
 
 
-class Classcreationtemplate(ABC):
+class ClassCreationTemplate(ABC):
 
     """ Template method for class creation """
 
     def create_class(self, data: Dict, trainer_id: str) -> Tuple[bool, str, int, Optional[str]]:
         """ Template method that defines the algorithm skeleton """
 
-        error = self._validate_capacity(data)
+        error = self.validate_capacity(data)
         if error:
             return False, error, 406, None
 
-        error = self._validate_time(data)
+        error = self.validate_time(data)
         if error:
             return False, error, 406, None
 
-        error = self._validate_date(data)
+        error = self.validate_date(data)
         if error:
             return False, error, 406, None
         # parse datetime
-        start_dt, end_dt = self._parse_datetime(data)
+        start_dt, end_dt = self.parse_datetime(data)
 
         # Build class document
         class_doc = self.class_document(data, trainer_id, start_dt, end_dt)
@@ -38,7 +38,7 @@ class Classcreationtemplate(ABC):
             return "Capacity must be atleast 1"
         return None
 
-    def validate_time_format(self, data: Dict) -> Optional[str]:
+    def validate_time(self, data: Dict) -> Optional[str]:
         try:
             start_t = datetime.strptime(data["start_time"], "%H:%M").time()
             end_t = datetime.strptime(data["end_time"], "%H:%M").time()
@@ -49,7 +49,7 @@ class Classcreationtemplate(ABC):
             return "Start time must be before end time"
         return None
 
-    def validate_date_format(self, data: Dict) -> Optional[str]:
+    def validate_date(self, data: Dict) -> Optional[str]:
         try:
             date_input = datetime.strptime(data["date"], "%Y-%m-%d").date()
         except (TypeError, ValueError):
@@ -79,5 +79,6 @@ class Classcreationtemplate(ABC):
     def class_document(self, data: Dict, trainer_id: str, start_dt: datetime, end_dt: datetime) -> Dict:
         pass
 
+    @abstractmethod
     def save_class(self, class_doc: Dict) -> Optional[str]:
         pass

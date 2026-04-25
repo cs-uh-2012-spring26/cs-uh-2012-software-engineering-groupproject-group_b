@@ -6,7 +6,7 @@ from flask_restx import Namespace, Resource, fields
 
 from app.apis import MSG
 from app.db.users import MEMBER_ROLE, TRAINER_ROLE, UserResource
-from app.services.registration import RegistrationTemplate
+from app.services.templates.standard_registration import RegistrationTemplate
 
 VALID_ROLES = {MEMBER_ROLE, TRAINER_ROLE}
 

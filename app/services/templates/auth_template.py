@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, tuple, Optional
+from typing import Dict, Tuple, Optional
 
 
 class RegistrationTemplate(ABC):
@@ -14,30 +14,30 @@ class RegistrationTemplate(ABC):
     def register(self, request_data: Dict) -> Tuple[bool, str, int, Optional[str]]:
 
         # extarct and clean input
-        name, email, password, role = self._extract_input(request_data)
+        name, email, password, role = self.extract_input(request_data)
 
         # validate required fields
-        error = self._validate_required(name, email, password, role)
+        error = self.validate_required(name, email, password, role)
         if error:
             return False, error, 400, None
         # validate role
-        error = self._validate_role(role)
+        error = self.validate_role(role)
         if error:
             return False, error, 400, None
         # validate password
-        error = self._validate_password(password)
+        error = self.validate_password(password)
         if error:
             return False, error, 400, None
 
-        if self._email_exists(email):
+        if self.email_exists(email):
             return False, "Email already registered", 409, None
 
-        user_id = self._create_user(name, email, password, role)
+        user_id = self.create_user(name, email, password, role)
 
         if not user_id:
             return False, "Registration failed", 500, None
 
-        self._after_registartion(user_id, name, email, role)
+        self.after_registration(user_id, name, email, role)
 
         return True, f"{role.capitalize()} registered successfully", 201, user_id
 

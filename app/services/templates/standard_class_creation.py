@@ -1,10 +1,10 @@
-from app.services.class_creation_template import Classcreationtemplate
+from app.services.templates.class_creation_template import ClassCreationTemplate
 from app.db.classes import ClassResource
 from datetime import datetime
 from typing import Dict, Tuple, Optional
 
 
-class Classcreation(Classcreationtemplate):
+class StandardClassCreation(ClassCreationTemplate):
     def class_document(self, data: Dict, trainer_id: str, start_dt: datetime, end_dt: datetime) -> Dict:
 
         return {

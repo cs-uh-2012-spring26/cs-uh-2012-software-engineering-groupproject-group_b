@@ -1,10 +1,10 @@
-from app.services.member_template import MemberTemplate
+from app.services.templates.member_access_template import MemberAccessTemplate
 from app.db.classes import ClassResource
 from app.db.users import UserResource
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 
 
-class MemberAccess(MemberTemplate):
+class StandardMemberAccess(MemberAccessTemplate):
     def find_class(self, class_id: str) -> Optional[Dict]:
         class_resource = ClassResource()
         return class_resource.get_class_by_id(class_id)
