@@ -40,3 +40,14 @@ def member_token(app):
             identity="testId",
             additional_claims={"role": "member"},
         )
+
+
+@pytest.fixture
+def mock_jwt(mocker):
+    def setup(role):
+        mocker.patch(
+            "flask_jwt_extended.view_decorators.verify_jwt_in_request",
+            return_value=None
+        )
+        mocker.patch("flask_jwt_extended.get_jwt", return_value={"role": role})
+    return setup
