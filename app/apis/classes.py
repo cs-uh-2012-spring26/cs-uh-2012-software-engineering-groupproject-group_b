@@ -21,7 +21,9 @@ from app.db.classes import (
 )
 from app.db.users import UserResource
 
-from app.services.email import send_class_reminder
+from app.services.email_strategy import Emailstrategy
+from app.services.class_creation import Classcreation
+from app.services.member_access import MemberAccess
 from app.services.auth import trainer_required
 
 api = Namespace("classes", description="Endpoints for classes")
@@ -131,6 +133,12 @@ _REMINDER_RESPONSE = api.model(
 @api.route("/")
 class ClassList(Resource):
 
+    """ Handles class creation and listing """
+
+    def __init__(self, api=None):
+        super().__init__(api)
+        self.class_template = Classcreation()
+
     @trainer_required
     @api.doc(security="Bearer")
     @api.expect(_CLASS_CREATE_MODEL)
@@ -141,64 +149,12 @@ class ClassList(Resource):
     @api.response(HTTPStatus.FORBIDDEN, "Trainer access required", _ERROR_RESPONSE)
     def post(self):
         """Create a new class. Requires a trainer JWT."""
-        data = request.json
         trainer_id = get_jwt_identity()
 
-        name = data[CLASS_NAME]
-        description = data[CLASS_DESCRIPTION]
-        trainer_name = data[TRAINER_NAME]
-        date_str = data[CLASS_DATE]
-        start_time = data[CLASS_START_TIME]
-        end_time = data[CLASS_END_TIME]
-        room_number = data[CLASS_ROOM_NUMBER]
-        capacity = data[CLASS_CAPACITY]
-
-        # capacity validation
-        if capacity < 1:
-            return {MSG: "Capacity must be at least 1"}, HTTPStatus.NOT_ACCEPTABLE
-
-        # time validation
-        try:
-            start_t = datetime.strptime(start_time, "%H:%M").time()
-            end_t = datetime.strptime(end_time, "%H:%M").time()
-        except (TypeError, ValueError):
-            return {MSG: "Invalid time format, expected HH:MM"}, HTTPStatus.NOT_ACCEPTABLE
-
-        if start_t >= end_t:
-            return {MSG: "Start time must be before end time"}, HTTPStatus.NOT_ACCEPTABLE
-
-        try:
-            date_input = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except (TypeError, ValueError):
-            return {MSG: "Invalid date format, expected YYYY-MM-DD"}, HTTPStatus.NOT_ACCEPTABLE
-
-        now = datetime.now()
-        if date_input < now.date():
-            return {MSG: "Date must be today or in the future"}, HTTPStatus.NOT_ACCEPTABLE
-
-        if date_input == now.date() and start_t <= now.time():
-            return {MSG: "Start time must be in the future for today's classes"}, HTTPStatus.NOT_ACCEPTABLE
-
-        start_dt = datetime.combine(date_input, start_t)
-        end_dt = datetime.combine(date_input, end_t)
-
-
-        new_class = {
-            CLASS_NAME: name,
-            CLASS_DESCRIPTION: description,
-            TRAINER_NAME: trainer_name,
-            CLASS_DATE: date_str,
-            CLASS_START_TIME: start_time,
-            CLASS_END_TIME: end_time,
-            CLASS_ROOM_NUMBER: room_number,
-            CLASS_CAPACITY: capacity,
-            CLASS_TRAINER_ID: trainer_id,
-            CLASS_USER_IDS: [],
-        }
-
-        class_resource = ClassResource()
-        class_id = class_resource.create_class(new_class)
-        return {MSG: f"Class created with id: {class_id}"}, HTTPStatus.OK
+        success, message, status_code, class_id = self.class_template.create_class(
+            request.json, trainer_id
+        )
+        return {MSG: message}, status_code
 
     @api.response(HTTPStatus.OK, "All upcoming classes", _CLASS_LIST_RESPONSE)
     def get(self):
@@ -216,6 +172,11 @@ class ClassList(Resource):
 @api.route("/<class_id>/members")
 @api.param("class_id", "The ID of the class")
 class ClassDetail(Resource):
+    """ View members enrolled in a class """
+
+    def __init__(self, api=None):
+        super().__init__(api)
+        self.class_template = MemberAccess()
 
     @trainer_required
     @api.doc(security="Bearer")
@@ -225,26 +186,12 @@ class ClassDetail(Resource):
     @api.response(HTTPStatus.FORBIDDEN, "Trainer access required", _ERROR_RESPONSE)
     def get(self, class_id):
         """View the list of members enrolled in a class (trainer only)."""
-        class_resource = ClassResource()
-        fitness_class = class_resource.get_class_by_id(class_id)
-        if fitness_class is None:
-            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
 
-        user_oids = fitness_class.get("user_ids", [])
-        if not user_oids:
-            return []
+        members, error = self.member_access.get_enrolled_members(class_id)
 
-        user_resource = UserResource()
-        members = user_resource.get_users_by_ids(user_oids)
-
-        return [
-            {
-                "name": m.get("name", ""),
-                "email": m.get("email", ""),
-                "contact": m.get("contact", ""),
-            }
-            for m in members
-        ]
+        if error:
+            return {MSG: error}, HTTPStatus.NOT_FOUND
+        return members, HTTPStatus.OK
 
 # =========================================================================
 # /classes/<class_id>/remind
@@ -254,6 +201,13 @@ class ClassDetail(Resource):
 @api.route("/<class_id>/remind")
 @api.param("class_id", "The ID of the class")
 class SendClassReminder(Resource):
+
+    """ send reminders to enrolled members """
+
+    def __init__(self, api=None):
+        super().__init__(api)
+        self.email_strategy = Emailstrategy()
+        self.member_access = MemberAccess()
 
     @trainer_required
     @api.doc(security="Bearer")
@@ -268,6 +222,16 @@ class SendClassReminder(Resource):
         In SES sandbox mode, each recipient email must be individually verified
         in the AWS SES console before emails can be delivered.
         """
+
+        members, error = self.member_access.get_enroled_members(class_id)
+
+        if error:
+            return {MSG: error}, HTTPStatus.NOT_FOUND
+
+        if not members:
+            return {MSG: "No members enrolled", "sent_to": [], "failed": []}, HTTPStatus.OK
+
+        # Verify that trainer owns the class
         class_resource = ClassResource()
         fitness_class = class_resource.get_class_by_id(class_id)
         if fitness_class is None:
@@ -277,24 +241,14 @@ class SendClassReminder(Resource):
         if fitness_class.get(CLASS_TRAINER_ID) != trainer_identity:
             return {MSG: "You are not the trainer assigned to this class"}, HTTPStatus.FORBIDDEN
 
-        user_resource = UserResource()
-
-        user_oids = fitness_class.get("user_ids", [])
-        if not user_oids:
-            return {MSG: "No members enrolled in this class", "sent_to": [], "failed": []}, HTTPStatus.OK
-
-        members = user_resource.get_users_by_ids(user_oids)
-
         successes = []
         failures = []
         for member in members:
             email = member.get("email", "")
             name = member.get("name", "")
-            ok, err = send_class_reminder(
-                member_email=email,
-                member_name=name,
-                class_info=fitness_class,
-            )
+            ok, err = self.email_strategy.send_reminder(
+                email, name, fitness_class)
+
             if ok:
                 successes.append(email)
             else:
