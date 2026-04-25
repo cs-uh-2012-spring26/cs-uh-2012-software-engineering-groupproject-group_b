@@ -1,3 +1,4 @@
+import os
 from app.db import DB
 from app import create_app
 from dotenv import load_dotenv
