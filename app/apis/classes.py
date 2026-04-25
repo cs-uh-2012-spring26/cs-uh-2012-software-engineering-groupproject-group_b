@@ -19,7 +19,6 @@ from app.db.classes import (
     ClassResource,
 )
 from app.db.users import UserResource
-from app.services.notifications.email_service import EmailService
 from app.services.notifications.dispatcher import NotificationDispatcher
 from app.services.auth import trainer_required
 from app.services.templates.standard_class_creation import StandardClassCreation

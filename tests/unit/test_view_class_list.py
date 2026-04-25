@@ -7,7 +7,8 @@ from bson import ObjectId
 from flask import Flask
 from flask_restx import Api
 from flask_jwt_extended import JWTManager, create_access_token
-from app.apis.member import api as member_api
+from app.apis.classes import api as classes_api
+from app.apis.users import api as users_api
 from app.db import DB
 from pytest_mock import MockerFixture
 from unittest.mock import patch, MagicMock
@@ -70,7 +71,8 @@ def app():
     jwt = JWTManager(app)
 
     api = Api(app)
-    api.add_namespace(member_api, path="/api/member")
+    api.add_namespace(classes_api, path="/api/classes")
+    api.add_namespace(users_api, path="/api/users")
     return app
 
 # Creating a test client fixture that sends HTTP requests to the app
@@ -89,24 +91,6 @@ def auth_headers(app):
         user_id = str(ObjectId())
         access_token = create_access_token(identity=user_id)
         return {"Authorization": f"Bearer {access_token}"}
-
-# replace the real database with an in-memory mock
-
-
-@pytest.fixture
-def mock_db():
-    # Mock the database with im-memory collection
-    with patch("app.apis.member.DB") as mock_db:
-
-        mock_collection = MagicMock()
-        upcoming_classes = [
-            c for c in MOCK_CLASSES if c["start_time"] >= datetime.now()]
-        mock_cursor = MagicMock()
-        mock_cursor.__iter__.return_value = iter(upcoming_classes)
-        mock_cursor.sort.return_value = mock_cursor
-        mock_collection.find.return_value = mock_cursor
-        mock_db.get_collection.return_value = mock_collection
-        yield mock_db
 
 
 def test_get_all_classes_success(client, mock_db):

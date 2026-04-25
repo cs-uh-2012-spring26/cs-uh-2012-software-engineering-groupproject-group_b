@@ -4,7 +4,7 @@ from typing import Optional
 import re
 
 
-class Registration(RegistrationTemplate):
+class StandardRegistration(RegistrationTemplate):
 
     """Register a new member or trainer account.
 
