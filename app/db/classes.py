@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import uuid4
 
 from app.db.utils import serialize_item, serialize_items, serialize_class
 from app.db import DB
@@ -21,6 +22,7 @@ CLASS_CAPACITY = "capacity"
 
 CLASS_USER_IDS = "user_ids"
 CLASS_TRAINER_ID = "trainer_id"
+CLASS_RECURRENCE_GROUP_ID = "recurrence_group_id"
 
 class ClassResource:
     def __init__(self):
@@ -42,6 +44,23 @@ class ClassResource:
         result = self.collection.insert_one(class_doc)
         return result.inserted_id
 
+
+    def create_recurring_classes(self, base_data: dict, occurrence_dates: list) -> list[str]:
+        """Bulk-insert one class document per occurrence date. Returns list of inserted IDs."""
+        if not occurrence_dates:
+            return []
+        group_id = str(uuid4())
+        docs = [
+            {
+                **base_data,
+                CLASS_DATE: occ_date.strftime("%Y-%m-%d"),
+                CLASS_USER_IDS: [],
+                CLASS_RECURRENCE_GROUP_ID: group_id,
+            }
+            for occ_date in occurrence_dates
+        ]
+        result = self.collection.insert_many(docs)
+        return [str(oid) for oid in result.inserted_ids]
 
     def get_all_upcoming_classes(self)->list[dict]:
         now = datetime.now()

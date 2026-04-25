@@ -21,8 +21,13 @@ from app.db.classes import (
 )
 from app.db.users import UserResource
 
+from app.recurrence import get_recurrence_strategy, SUPPORTED_RECURRENCES
 from app.services.auth import trainer_required
 from app.services.notifications.dispatcher import NotificationDispatcher
+
+RECURRENCE = "recurrence"
+RECURRENCE_END_DATE = "recurrence_end_date"
+MAX_OCCURRENCES = 365
 
 api = Namespace("classes", description="Endpoints for classes")
 
@@ -58,12 +63,30 @@ _CLASS_CREATE_MODEL = api.model(
         ),
         CLASS_ROOM_NUMBER: fields.String(required=True, example="101"),
         CLASS_CAPACITY: fields.Integer(required=True, example=10),
+        RECURRENCE: fields.String(
+            required=False,
+            example="weekly",
+            description=f"Recurrence pattern. Supported: {SUPPORTED_RECURRENCES}. Omit for a one-off class.",
+        ),
+        RECURRENCE_END_DATE: fields.String(
+            required=False,
+            example="2030-06-01",
+            description="Last date (inclusive) for the recurring series (YYYY-MM-DD). Required when 'recurrence' is set.",
+        ),
     },
 )
 
 _CLASS_CREATED_RESPONSE = api.model(
     "ClassCreated",
     {MSG: fields.String(example="Class created with id: 664f1e...")},
+)
+
+_RECURRING_CLASS_RESPONSE = api.model(
+    "RecurringClassCreated",
+    {
+        MSG: fields.String(description="Summary of recurring class creation"),
+        "class_ids": fields.List(fields.String(), description="IDs of all created class instances"),
+    },
 )
 
 # ---------------------------------------------------------------------------
@@ -199,7 +222,33 @@ class ClassList(Resource):
             CLASS_USER_IDS: [],
         }
 
+        recurrence = data.get(RECURRENCE)
         class_resource = ClassResource()
+
+        if recurrence:
+            strategy = get_recurrence_strategy(recurrence)
+            if strategy is None:
+                return {MSG: f"Invalid recurrence type '{recurrence}'. Supported: {SUPPORTED_RECURRENCES}"}, HTTPStatus.NOT_ACCEPTABLE
+
+            recurrence_end_date_str = data.get(RECURRENCE_END_DATE)
+            if not recurrence_end_date_str:
+                return {MSG: "recurrence_end_date is required when recurrence is specified"}, HTTPStatus.BAD_REQUEST
+
+            try:
+                recurrence_end = datetime.strptime(recurrence_end_date_str, "%Y-%m-%d").date()
+            except (TypeError, ValueError):
+                return {MSG: "Invalid recurrence_end_date format, expected YYYY-MM-DD"}, HTTPStatus.NOT_ACCEPTABLE
+
+            if recurrence_end < date_input:
+                return {MSG: "recurrence_end_date must be on or after the class start date"}, HTTPStatus.NOT_ACCEPTABLE
+
+            occurrence_dates = list(strategy.generate_dates(date_input, recurrence_end))
+            if len(occurrence_dates) > MAX_OCCURRENCES:
+                return {MSG: f"Recurrence generates {len(occurrence_dates)} classes, exceeding the maximum of {MAX_OCCURRENCES}"}, HTTPStatus.NOT_ACCEPTABLE
+
+            class_ids = class_resource.create_recurring_classes(new_class, occurrence_dates)
+            return {MSG: f"{len(class_ids)} recurring classes created", "class_ids": class_ids}, HTTPStatus.OK
+
         class_id = class_resource.create_class(new_class)
         return {MSG: f"Class created with id: {class_id}"}, HTTPStatus.OK
 
