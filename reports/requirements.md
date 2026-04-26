@@ -396,6 +396,73 @@ A7: Class has already ended
 
 ---
 
+## Feature 6: Create Recurring Classes
+
+**User story: As a fitness trainer, I want to create a class that repeats on a regular schedule, so that I don't have to manually create each occurrence one by one.**
+
+**Use Case Name:** Create Recurring Fitness Classes
+
+**Preconditions**
+
+1. The trainer is authenticated with a valid JWT token.
+2. The trainer's account has the role of "trainer".
+3. All required class fields are provided (name, description, trainer name, date, start time, end time, room number, capacity).
+
+**Main Success Scenario**
+
+1. The trainer sends a POST request to the class creation endpoint with all required class fields, a `recurrence` type (e.g. "daily" or "weekly"), and a `recurrence_end_date`.
+2. The system validates the JWT token and confirms the requester's role is "trainer".
+3. The system validates all class fields: capacity is at least 1, time format is valid (HH:MM), start time is before end time, and the class date is today or in the future.
+4. The system validates that the `recurrence` type is supported (daily or weekly).
+5. The system validates that `recurrence_end_date` is present, correctly formatted (YYYY-MM-DD), and falls on or after the class start date.
+6. The system generates all occurrence dates from the start date to the end date using the specified recurrence pattern.
+7. The system verifies the total number of occurrences does not exceed 365.
+8. The system creates one class instance per occurrence date, all sharing the same class details and a common recurrence group ID.
+9. The system returns a 200 OK response with a success message and the list of all created class IDs.
+
+**Alternative Flows/Extensions**
+
+A1: Missing or invalid JWT token
+
+- At step 2, if no token is provided or the token is invalid/expired, the system rejects the request with a 401 Unauthorized response.
+
+A2: Insufficient role
+
+- At step 2, if the requester's role is not "trainer", the system rejects the request with a 403 Forbidden response.
+
+A3: Invalid class field values
+
+- At step 3, if any field fails validation (e.g. capacity less than 1, invalid time format, start time not before end time, or date in the past), the system rejects the request with a 406 Not Acceptable response and an error message identifying the issue.
+
+A4: Unsupported recurrence type
+
+- At step 4, if the provided `recurrence` value is not supported (e.g. "monthly"), the system rejects the request with a 406 Not Acceptable response listing the supported recurrence types.
+
+A5: Missing recurrence end date
+
+- At step 5, if `recurrence_end_date` is not provided, the system rejects the request with a 400 Bad Request response.
+
+A6: Invalid recurrence end date format
+
+- At step 5, if `recurrence_end_date` is not in YYYY-MM-DD format, the system rejects the request with a 406 Not Acceptable response.
+
+A7: Recurrence end date before class start date
+
+- At step 5, if `recurrence_end_date` is earlier than the class start date, the system rejects the request with a 406 Not Acceptable response.
+
+A8: Too many occurrences
+
+- At step 7, if the generated occurrence count exceeds 365, the system rejects the request with a 406 Not Acceptable response stating the limit.
+
+**Success Guarantee / Postconditions**
+
+1. One class instance is created in the database for each occurrence date in the recurrence range.
+2. All created class instances share the same class details and a common recurrence group ID.
+3. The system returns the full list of created class IDs in the response.
+4. Only authenticated trainers can create recurring classes; members and unauthenticated users cannot.
+
+---
+
 ## Feature 7: Configure Notifications
 
 **User story: As someone registered in a fitness class, I want to choose how I receive reminders (e.g. email and/or Telegram), so I can stay informed in the ways that suit me.**
