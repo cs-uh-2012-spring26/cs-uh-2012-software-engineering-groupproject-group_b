@@ -51,7 +51,7 @@ class MemberAccessTemplate(ABC):
             {
                 "name": m.get("name", ""),
                 "email": m.get("email", ""),
-                "contact": m.get("contact", ""),
+                "telegram_chat_id": m.get("telegram_chat_id"),
             }
             for m in members
         ]
