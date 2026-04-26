@@ -5,6 +5,7 @@ from flask_jwt_extended import create_access_token
 from flask_jwt_extended import create_access_token
 from app import create_app
 from app.db import DB
+import os
 
 
 @pytest.fixture(scope="session", autouse=True)

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.db.utils import serialize_item, serialize_items, serialize_class
+from app.db.utils import serialize_class
 from app.db import DB
 from bson import ObjectId
 
@@ -66,6 +66,8 @@ class ClassResource:
             return None
 
         class_doc = self.collection.find_one({"_id": oid})
+        if class_doc is None:
+            return None
         return serialize_class(class_doc)
 
     def add_user_to_class(self, class_id: str, user_id: str)->str:
