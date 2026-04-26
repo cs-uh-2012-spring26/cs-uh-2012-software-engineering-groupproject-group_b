@@ -9,7 +9,7 @@ from http import HTTPStatus
 from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_restx import Api
-
+from flask_jwt_extended.exceptions import NoAuthorizationError
 
 def create_app():
     app = Flask(__name__)
@@ -36,6 +36,10 @@ def create_app():
     api.add_namespace(auth_ns)
     api.add_namespace(classes_ns)
     api.add_namespace(users_ns)
+
+    @api.errorhandler(NoAuthorizationError)
+    def handle_missing_token(error):
+        return {"message": str(error)}, HTTPStatus.UNAUTHORIZED
 
     @api.errorhandler(Exception)
     def handle_input_validation_error(error):
