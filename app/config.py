@@ -7,13 +7,14 @@ from dotenv import load_dotenv
 def get_required_environ(name: str) -> str:
     load_dotenv(override=True)
     try:
-        value = environ[name]
+        value = environ.get(name, "")
     except KeyError as e:
         logging.fatal(f"Environment variable {e} is required.")
         raise KeyError
 
     if len(value.strip()) == 0:
-        raise ValueError(f"Required environment variable {name} cannot be empty")
+        raise ValueError(
+            f"Required environment variable {name} cannot be empty")
     return value
 
 
@@ -28,4 +29,3 @@ class Config(object):
     AWS_SES_REGION = get_required_environ("AWS_SES_REGION")
     SES_SENDER_EMAIL = get_required_environ("SES_SENDER_EMAIL")
     TELEGRAM_BOT_TOKEN = get_required_environ("TELEGRAM_BOT_TOKEN")
-
