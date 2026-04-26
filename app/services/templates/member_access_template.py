@@ -31,8 +31,7 @@ class MemberAccessTemplate(ABC):
             return [], fitness_class, None
         # Fetch members
         members = self.fetch_members(member_ids)
-        # fprmat response
-        return self.format_members(members), None
+        return self.format_members(members), fitness_class, None
 
     @abstractmethod
     def find_class(self, class_id: str) -> Optional[Dict]:

@@ -19,10 +19,15 @@ from app.db.classes import (
     ClassResource,
 )
 from app.db.users import UserResource
-from app.services.notifications.dispatcher import NotificationDispatcher
+from app.recurrence import SUPPORTED_RECURRENCES
 from app.services.auth import trainer_required
+from app.services.notifications.dispatcher import NotificationDispatcher
+from app.services.templates.recurring_class_creation import RecurringClassCreation
 from app.services.templates.standard_class_creation import StandardClassCreation
 from app.services.templates.standard_member_access import StandardMemberAccess
+
+RECURRENCE = "recurrence"
+RECURRENCE_END_DATE = "recurrence_end_date"
 
 api = Namespace("classes", description="Endpoints for classes")
 
@@ -58,12 +63,30 @@ _CLASS_CREATE_MODEL = api.model(
         ),
         CLASS_ROOM_NUMBER: fields.String(required=True, example="101"),
         CLASS_CAPACITY: fields.Integer(required=True, example=10),
+        RECURRENCE: fields.String(
+            required=False,
+            example="weekly",
+            description=f"Recurrence pattern. Supported: {SUPPORTED_RECURRENCES}. Omit for a one-off class.",
+        ),
+        RECURRENCE_END_DATE: fields.String(
+            required=False,
+            example="2030-06-01",
+            description="Last date (inclusive) for the recurring series (YYYY-MM-DD). Required when 'recurrence' is set.",
+        ),
     },
 )
 
 _CLASS_CREATED_RESPONSE = api.model(
     "ClassCreated",
     {MSG: fields.String(example="Class created with id: 664f1e...")},
+)
+
+_RECURRING_CLASS_RESPONSE = api.model(
+    "RecurringClassCreated",
+    {
+        MSG: fields.String(description="Summary of recurring class creation"),
+        "class_ids": fields.List(fields.String(), description="IDs of all created class instances"),
+    },
 )
 
 # ---------------------------------------------------------------------------
@@ -105,7 +128,6 @@ _MEMBER_ITEM = api.model(
     },
 )
 
-
 _FAILED_NOTIFICATION = api.model(
     "FailedNotification",
     {
@@ -139,6 +161,7 @@ class ClassList(Resource):
     def __init__(self, api=None):
         super().__init__(api)
         self.class_template = StandardClassCreation()
+        self.recurring_template = RecurringClassCreation()
 
     @trainer_required
     @api.doc(security="Bearer")
@@ -150,11 +173,17 @@ class ClassList(Resource):
     @api.response(HTTPStatus.FORBIDDEN, "Trainer access required", _ERROR_RESPONSE)
     def post(self):
         """Create a new class. Requires a trainer JWT."""
+        data = request.json
         trainer_id = get_jwt_identity()
 
-        success, message, status_code, class_id = self.class_template.create_class(
-            request.json, trainer_id
-        )
+        recurrence = data.get(RECURRENCE)
+        if recurrence:
+            success, message, status_code, class_ids = self.recurring_template.create_recurring_class(data, trainer_id)
+            if not success:
+                return {MSG: message}, status_code
+            return {MSG: message, "class_ids": class_ids}, status_code
+
+        success, message, status_code, class_id = self.class_template.create_class(data, trainer_id)
         return {MSG: message}, status_code
 
     @api.response(HTTPStatus.OK, "All upcoming classes", _CLASS_LIST_RESPONSE)
@@ -176,6 +205,7 @@ class ClassList(Resource):
 @api.route("/<class_id>/members")
 @api.param("class_id", "The ID of the class")
 class ClassDetail(Resource):
+
     """ View members enrolled in a class """
 
     def __init__(self, api=None):
@@ -199,6 +229,7 @@ class ClassDetail(Resource):
 
         return members
 
+
 # =========================================================================
 # /classes/<class_id>/remind
 # =========================================================================
@@ -208,7 +239,7 @@ class ClassDetail(Resource):
 @api.param("class_id", "The ID of the class")
 class SendClassReminder(Resource):
 
-    """ send reminders to enrolled members """
+    """ Send reminders to enrolled members """
 
     def __init__(self, api=None):
         super().__init__(api)
@@ -227,34 +258,28 @@ class SendClassReminder(Resource):
         In SES sandbox mode, each recipient email must be individually verified
         in the AWS SES console before emails can be delivered.
         """
-        members, fitness_class, error = self.member_access.get_enrolled_members_with_class(
-            class_id)
+        members, fitness_class, error = self.member_access.get_enrolled_members_with_class(class_id)
 
         if error:
             return {MSG: error}, HTTPStatus.NOT_FOUND
-
-        if not members:
-            return {MSG: "No members enrolled", "sent_to": [], "failed": []}, HTTPStatus.OK
-
-        # Verify that trainer owns the class
 
         trainer_identity = get_jwt_identity()
         if fitness_class.get(CLASS_TRAINER_ID) != trainer_identity:
             return {MSG: "You are not the trainer assigned to this class"}, HTTPStatus.FORBIDDEN
 
-        # dispatch notification
+        if not members:
+            return {MSG: "No members enrolled in this class", "sent_to": [], "failed": []}, HTTPStatus.OK
+
         dispatcher = NotificationDispatcher()
         successes: list[str] = []
         failures:  list[dict] = []
 
         for member in members:
-            all_ok, errors = dispatcher.dispatch_to_member(
-                member, fitness_class)
+            all_ok, errors = dispatcher.dispatch_to_member(member, fitness_class)
             if all_ok:
                 successes.append(member.get("email", ""))
             else:
-                failures.append(
-                    {"member": member.get("email", ""), "errors": errors})
+                failures.append({"member": member.get("email", ""), "errors": errors})
 
         return {
             MSG: f"Reminders processed: {len(successes)} sent, {len(failures)} with failures",
