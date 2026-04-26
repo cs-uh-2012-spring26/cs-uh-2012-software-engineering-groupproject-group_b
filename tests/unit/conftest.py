@@ -1,6 +1,5 @@
 import pytest
 from flask_jwt_extended import create_access_token
-from flask_jwt_extended import create_access_token
 from app import create_app
 from app.config import TestConfig
 from app.db import DB
@@ -50,3 +49,5 @@ def member_token(app):
             identity="testId",
             additional_claims={"role": "member"},
         )
+
+
