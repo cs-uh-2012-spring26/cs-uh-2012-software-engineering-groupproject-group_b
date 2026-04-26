@@ -51,6 +51,7 @@ class MemberAccessTemplate(ABC):
                 "name": m.get("name", ""),
                 "email": m.get("email", ""),
                 "telegram_chat_id": m.get("telegram_chat_id"),
+                "notification_prefs": m.get("notification_prefs"),
             }
             for m in members
         ]
