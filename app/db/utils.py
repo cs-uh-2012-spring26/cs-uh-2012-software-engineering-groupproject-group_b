@@ -52,4 +52,6 @@ def serialize_class(class_doc: dict):
         "end_time": class_doc.get("end_time"),
         "room_number": class_doc.get("room_number"),
         "capacity": class_doc.get("capacity"),
+        "trainer_id": class_doc.get("trainer_id"),
+        "user_ids": [serialize_oid(uid) for uid in class_doc.get("user_ids") or []]
     }

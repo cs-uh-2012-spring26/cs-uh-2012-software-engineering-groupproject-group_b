@@ -1,5 +1,6 @@
 import pytest
 from flask_jwt_extended import create_access_token
+from flask_jwt_extended import create_access_token
 from app import create_app
 from app.config import TestConfig
 
@@ -19,18 +20,20 @@ def client(app):
 def runner(app):
     return app.test_cli_runner()
 
+
 @pytest.fixture
 def trainer_token(app):
     with app.app_context():
         return create_access_token(
-                identity="testId",
-                additional_claims={"role": "trainer"},
-            )
+            identity="testId",
+            additional_claims={"role": "trainer"},
+        )
+
 
 @pytest.fixture
 def member_token(app):
     with app.app_context():
         return create_access_token(
-                identity="testId",
-                additional_claims={"role": "member"},
-            )
+            identity="testId",
+            additional_claims={"role": "member"},
+        )

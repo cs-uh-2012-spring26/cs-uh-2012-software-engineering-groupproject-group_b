@@ -7,13 +7,14 @@ from dotenv import load_dotenv
 def get_required_environ(name: str) -> str:
     load_dotenv(override=False)
     try:
-        value = environ[name]
+        value = environ.get(name, "")
     except KeyError as e:
         logging.fatal(f"Environment variable {e} is required.")
         raise KeyError
 
     if len(value.strip()) == 0:
-        raise ValueError(f"Required environment variable {name} cannot be empty")
+        raise ValueError(
+            f"Required environment variable {name} cannot be empty")
     return value
 
 
