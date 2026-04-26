@@ -65,6 +65,12 @@ def test_register_duplicate_email(client):
     assert second.status_code == HTTPStatus.CONFLICT
     assert second.json[MSG] == "Email already registered"
 
+def test_register_password_no_uppercase(client):
+    resp = client.post("/auth/register", json={
+        "name": "Test", "email": "test@test.com",
+        "password": "validpass1!", "role": "member"
+    })
+    assert resp.status_code == 400
 
 # LOGIN TESTS
 
