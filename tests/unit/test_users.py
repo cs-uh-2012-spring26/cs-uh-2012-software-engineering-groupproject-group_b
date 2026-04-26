@@ -141,6 +141,20 @@ def test_get_enrolled_classes_invalid_id_format(client,member_token):
     assert resp.status_code == HTTPStatus.BAD_REQUEST
     assert resp.get_json()[MSG] == "Invalid user ID format"
 
+def test_get_enrolled_classes_returns_list(client, member_auth, seeded_class):
+    """Enrolled classes return a list after booking."""
+    headers = {"Authorization": f"Bearer {member_auth}"}
+    client.post(f"/users/me/book{seeded_class}", headers=headers)
+    resp = client.get("/users/me/book", headers=headers)
+    assert isinstance(resp.get_json(),list)
+
+def test_get_enrolled_classes_empty_identity(client, app):
+    """JWT with empty identity returns 401."""
+    with app.app_context():
+        token = create_access_token(identity="", additional_claims={"role": "member"})
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = client.get("/users/me/book", headers=headers)
+    assert resp.status_code == HTTPStatus.UNAUTHORIZED
 
 # ─── Tests: Update notification preferences  (PUT /users/me/notifications) ────
 
@@ -222,7 +236,7 @@ def test_update_notifications_telegram_whitespace_chat_id(client, member_auth):
 
 def test_update_notifications_persisted_in_db(client, member_auth, app):
     """After a successful PUT, preferences are actually saved in the DB."""
-    
+
     headers = {"Authorization": f"Bearer {member_auth}"}
     client.put("/users/me/notifications", json={
         "notification_prefs": {"email": True},
