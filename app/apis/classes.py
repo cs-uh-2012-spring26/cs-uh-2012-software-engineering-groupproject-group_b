@@ -19,7 +19,7 @@ from app.db.classes import (
     ClassResource,
 )
 from app.db.users import UserResource
-from app.recurrence import SUPPORTED_RECURRENCES
+from app.services.recurrence import SUPPORTED_RECURRENCES
 from app.services.auth import trainer_required
 from app.services.notifications.dispatcher import NotificationDispatcher
 from app.services.templates.recurring_class_creation import RecurringClassCreation
