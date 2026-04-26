@@ -38,12 +38,3 @@ def member_token(app):
         )
 
 
-@pytest.fixture
-def mock_jwt(mocker):
-    def _mock(role):
-        mocker.patch(
-            "app.services.auth.verify_jwt_in_request",
-            return_value=None,
-        )
-        mocker.patch("app.services.auth.get_jwt", return_value={"role": role})
-    return _mock
