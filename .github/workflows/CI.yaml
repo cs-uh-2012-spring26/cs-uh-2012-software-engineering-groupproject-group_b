@@ -26,9 +26,14 @@ jobs:
 
       - name: Run tests with coverage
         env:
-          MONGO_URI: "mongodb://localhost:27017"
-          DB_NAME: "eventsref_test"
-          MOCK_DB: "true"
-          DEBUG: "true"
-          JWT_SECRET_KEY: "ci-secret-key-for-testing-only"
+          MONGO_URI: ${{ vars.MONGO_URI }}
+          DB_NAME: ${{ vars.DB_NAME }}
+          MOCK_DB: ${{ vars.MOCK_DB }}
+          DEBUG: ${{ vars.DEBUG }}
+          JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SES_REGION: ${{ secrets.AWS_SES_REGION }}
+          SES_SENDER_EMAIL: ${{ secrets.SES_SENDER_EMAIL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: pytest --cov=app --cov-report=term-missing tests/
