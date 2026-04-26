@@ -68,3 +68,5 @@ def seeded_class(client, trainer_token):
         "capacity": 10,
     }, headers=headers)
     return resp.get_json()["message"].split(":")[-1].strip()
+
+
