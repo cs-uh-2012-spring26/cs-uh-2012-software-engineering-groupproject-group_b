@@ -1,68 +1,117 @@
-"""
-Unit tests for Feature 4: View Member List
-
-Endpoint: GET /classes/<class_id>/members
-
-Refactored: Tests mock the template layer instead of database internals.
-Uses mock_jwt fixture from conftest.py.
-"""
-
 from http import HTTPStatus
+
 import pytest
 
+from app.apis import MSG
+from app.db.classes import (
+    CLASS_CAPACITY,
+    CLASS_DATE,
+    CLASS_DESCRIPTION,
+    CLASS_END_TIME,
+    CLASS_NAME,
+    CLASS_ROOM_NUMBER,
+    CLASS_START_TIME,
+    CLASS_TRAINER_ID,
+    CLASS_USER_IDS,
+    TRAINER_NAME,
+    ClassResource,
+)
+from app.db.users import UserResource
 
-def test_view_members_success(client, mock_jwt, mocker):
-    mock_jwt("trainer")
+def _class_doc(user_ids=None):
+    return {
+        CLASS_NAME: "Member List Test Class",
+        CLASS_DESCRIPTION: "A class for testing member list endpoint",
+        TRAINER_NAME: "John Doe",
+        CLASS_DATE: "2030-01-01",
+        CLASS_START_TIME: "10:00",
+        CLASS_END_TIME: "11:00",
+        CLASS_ROOM_NUMBER: "101",
+        CLASS_CAPACITY: 10,
+        CLASS_TRAINER_ID: "testId",
+        CLASS_USER_IDS: user_ids or [],
+    }
 
-    mock_members = [
-        {"name": "Alice", "email": "alice@example.com", "contact": "555-0001"},
-        {"name": "Bob",   "email": "bob@example.com",   "contact": "555-0002"},
-    ]
-    mocker.patch(
-        "app.apis.classes.StandardMemberAccess.get_enrolled_members",
-        return_value=(mock_members, None)
+@pytest.fixture
+def seeded_members_class():
+    user_resource = UserResource()
+    member_a_id = user_resource.collection.insert_one(
+        {
+            "name": "Alice Member",
+            "email": "alice@example.com",
+            "role": "member",
+            "telegram_chat_id": "alice_telegram",
+            "class_ids": [],
+        }
+    ).inserted_id
+    member_b_id = user_resource.collection.insert_one(
+        {
+            "name": "Bob Member",
+            "email": "bob@example.com",
+            "role": "member",
+            "telegram_chat_id": "bob_telegram",
+            "class_ids": [],
+        }
+    ).inserted_id
+    class_resource = ClassResource()
+
+    class_id = class_resource.collection.insert_one(
+        _class_doc([member_a_id, member_b_id])
+    ).inserted_id
+
+    return str(class_id)
+
+
+@pytest.fixture
+def empty_members_class():
+    class_resource = ClassResource()
+    class_id = class_resource.collection.insert_one(_class_doc([])).inserted_id
+    return str(class_id)
+
+
+def test_view_members_forbidden_for_member_role(client, member_token,seeded_members_class):
+    response = client.get(
+        f"/classes/{seeded_members_class}/members",
+        headers={"Authorization": f"Bearer {member_token}"},
     )
 
-    response = client.get("/classes/class-1/members")
-    assert response.status_code == HTTPStatus.OK
-    members = response.get_json()
-    assert len(members) == 2
-    assert members[0]["name"] == "Alice"
-    assert members[1]["name"] == "Bob"
-
-
-def test_view_members_empty_class(client, mock_jwt, mocker):
-    mock_jwt("trainer")
-    mocker.patch(
-        "app.apis.classes.StandardMemberAccess.get_enrolled_members",
-        return_value=([], None)
-    )
-    response = client.get("/classes/class-1/members")
-    assert response.status_code == HTTPStatus.OK
-    assert response.get_json() == []
-
-
-def test_view_members_class_not_found(client, mock_jwt, mocker):
-    mock_jwt("trainer")
-    mocker.patch(
-        "app.apis.classes.StandardMemberAccess.get_enrolled_members",
-        return_value=(None, "Class not found")
-    )
-    response = client.get("/classes/nonexistent-id/members")
-    assert response.status_code == HTTPStatus.NOT_FOUND
-
-
-def test_view_members_forbidden_for_member_role(client, mock_jwt, mocker):
-    mock_jwt("member")
-    response = client.get("/classes/class-1/members")
     assert response.status_code == HTTPStatus.FORBIDDEN
+    assert response.json[MSG] == "Access forbidden: insufficient permissions"
 
 
-def test_view_members_admin_role_allowed(client, mock_jwt, mocker):
-    mock_jwt("admin")
-    mocker.patch(
-        "app.apis.classes.StandardMemberAccess.get_enrolled_members",
-        return_value=([], None)
+def test_view_members_class_not_found(client, trainer_token):
+    response = client.get(
+        "/classes/random_class_id/members",
+        headers={"Authorization": f"Bearer {trainer_token}"},
     )
-    response = client.get("/classes/class-1/members")
+
+    assert response.status_code == HTTPStatus.NOT_FOUND
+    assert response.json[MSG] == "Class not found"
+
+
+def test_view_members_empty(client, trainer_token, empty_members_class):
+    response = client.get(
+        f"/classes/{empty_members_class}/members",
+        headers={"Authorization": f"Bearer {trainer_token}"},
+    )
+
     assert response.status_code == HTTPStatus.OK
+    assert response.json == []
+
+
+def test_view_members_returns_enrolled_members(client, trainer_token, seeded_members_class):
+    response = client.get(
+        f"/classes/{seeded_members_class}/members",
+        headers={"Authorization": f"Bearer {trainer_token}"},
+    )
+
+    assert response.status_code == HTTPStatus.OK
+    assert len(response.json) == 2
+
+    emails = {member["email"] for member in response.json}
+    names = {member["name"] for member in response.json}
+    telegram_ids = {member["telegram_chat_id"] for member in response.json}
+
+    assert emails == {"alice@example.com", "bob@example.com"}
+    assert names == {"Alice Member", "Bob Member"}
+    assert telegram_ids == {"alice_telegram", "bob_telegram"}

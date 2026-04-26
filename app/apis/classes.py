@@ -190,7 +190,7 @@ class ClassDetail(Resource):
     @api.response(HTTPStatus.FORBIDDEN, "Trainer access required", _ERROR_RESPONSE)
     def get(self, class_id):
         """View the list of members enrolled in a class (trainer only)."""
-        members, error = self.class_template(class_id)
+        members, error = self.class_template.get_enrolled_members(class_id)
         if error:
             return {MSG: error}, HTTPStatus.NOT_FOUND
 

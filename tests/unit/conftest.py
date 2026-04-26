@@ -3,12 +3,25 @@ from flask_jwt_extended import create_access_token
 from flask_jwt_extended import create_access_token
 from app import create_app
 from app.config import TestConfig
+from app.db import DB
 
 
 @pytest.fixture(scope="session", autouse=True)
 def app():
     app = create_app(TestConfig)
     yield app
+
+
+@pytest.fixture(autouse=True)
+def _clean_db(app):
+    # Wipe every collection in the (mongomock) test DB before and after each
+    # test so leftover documents from one test can't leak into another.
+    db = DB._get()
+    for name in db.list_collection_names():
+        db[name].delete_many({})
+    yield
+    for name in db.list_collection_names():
+        db[name].delete_many({})
 
 
 @pytest.fixture
