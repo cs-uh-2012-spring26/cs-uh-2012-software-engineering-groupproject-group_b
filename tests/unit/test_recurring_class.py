@@ -14,7 +14,7 @@ from app.db.classes import (
     CLASS_START_TIME,
     TRAINER_NAME,
 )
-from app.recurrence import (
+from app.services.recurrence import (
     DailyRecurrence,
     WeeklyRecurrence,
     get_recurrence_strategy,

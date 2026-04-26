@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from app.db.classes import ClassResource
-from app.recurrence import get_recurrence_strategy, SUPPORTED_RECURRENCES
+from app.services.recurrence import get_recurrence_strategy, SUPPORTED_RECURRENCES
 from app.services.templates.class_creation_template import ClassCreationTemplate
 
 
