@@ -16,7 +16,7 @@ from app.db.classes import (
 
 def payload(**overrides):
     base = {
-        CLASS_NAME: "Yoga",
+        CLASS_NAME: "VERY NEW TEST",
         CLASS_DESCRIPTION: "Relaxing yoga session",
         TRAINER_NAME: "John Doe",
         CLASS_DATE: "2030-01-01",

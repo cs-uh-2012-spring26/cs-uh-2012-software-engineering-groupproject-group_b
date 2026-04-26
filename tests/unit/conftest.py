@@ -1,20 +1,13 @@
 import pytest
-import os
-from dotenv import load_dotenv
 from flask_jwt_extended import create_access_token
 from flask_jwt_extended import create_access_token
 from app import create_app
-from app.db import DB
-import os
+from app.config import TestConfig
 
 
 @pytest.fixture(scope="session", autouse=True)
 def app():
-    os.environ["MOCK_DB"] = "true"
-    load_dotenv(override=False)
-    os.environ["MOCK_DB"] = "true"
-    load_dotenv(override=False)
-    app = create_app()
+    app = create_app(TestConfig)
     yield app
 
 
