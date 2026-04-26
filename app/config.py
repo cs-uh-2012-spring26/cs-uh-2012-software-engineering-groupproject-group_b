@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 
 def get_required_environ(name: str) -> str:
-    load_dotenv(override=True)
+    load_dotenv(override=False)
     try:
         value = environ[name]
     except KeyError as e:
@@ -28,3 +28,9 @@ class Config(object):
     AWS_SES_REGION = get_required_environ("AWS_SES_REGION")
     SES_SENDER_EMAIL = get_required_environ("SES_SENDER_EMAIL")
 
+class TestConfig(object):
+    MOCK_DB = True
+    MONGO_URI = "mongodb://localhost:27017"
+    DB_NAME = "test_db"
+    JWT_SECRET_KEY = get_required_environ("JWT_SECRET_KEY")
+    DEBUG = True

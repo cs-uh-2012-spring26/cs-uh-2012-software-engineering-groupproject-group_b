@@ -1,15 +1,12 @@
 import pytest
-from dotenv import load_dotenv
 from flask_jwt_extended import create_access_token
 from app import create_app
-from app.db import DB
+from app.config import TestConfig
 
 
 @pytest.fixture(scope="session", autouse=True)
 def app():
-    os.environ["MOCK_DB"] = "true"
-    load_dotenv(override=False)
-    app = create_app()
+    app = create_app(TestConfig)
     yield app
 
 
@@ -24,7 +21,7 @@ def runner(app):
 
 @pytest.fixture
 def trainer_token(app):
-    with app.app_context()
+    with app.app_context():
         return create_access_token(
                 identity="testId",
                 additional_claims={"role": "trainer"},
