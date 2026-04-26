@@ -27,6 +27,7 @@ class Config(object):
     AWS_SECRET_ACCESS_KEY = get_required_environ("AWS_SECRET_ACCESS_KEY")
     AWS_SES_REGION = get_required_environ("AWS_SES_REGION")
     SES_SENDER_EMAIL = get_required_environ("SES_SENDER_EMAIL")
+    TELEGRAM_BOT_TOKEN = get_required_environ("TELEGRAM_BOT_TOKEN")
 
 class TestConfig(object):
     MOCK_DB = True
