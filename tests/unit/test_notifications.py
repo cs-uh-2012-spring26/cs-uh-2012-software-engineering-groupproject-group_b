@@ -113,8 +113,7 @@ def test_telegram_generic_error():
 def test_dispatcher_email_success():
     """A member with email enabled gets a reminder and returns no errors."""
     member = {**_MEMBER, "notification_prefs": {"email": True, "telegram": False}}
-    with patch("app.services.notifications.dispatcher.EmailNotificationService") as mock_cls:
-        mock_cls.return_value.send.return_value = (True, "")
+    with patch.object(EmailNotificationService, "send", return_value=(True, "")):
         ok, errors = NotificationDispatcher().dispatch_to_member(member, _CLASS)
     assert ok is True
     assert errors == []
@@ -122,8 +121,7 @@ def test_dispatcher_email_success():
 
 def test_dispatcher_no_prefs_defaults_to_email():
     """A member with no notification_prefs falls back to the email default."""
-    with patch("app.services.notifications.dispatcher.EmailNotificationService") as mock_cls:
-        mock_cls.return_value.send.return_value = (True, "")
+    with patch.object(EmailNotificationService, "send", return_value=(True, "")):
         ok, errors = NotificationDispatcher().dispatch_to_member(_MEMBER, _CLASS)
     assert ok is True
 
@@ -131,8 +129,7 @@ def test_dispatcher_no_prefs_defaults_to_email():
 def test_dispatcher_records_failure():
     """A failed channel is recorded in the errors list."""
     member = {**_MEMBER, "notification_prefs": {"email": True}}
-    with patch("app.services.notifications.dispatcher.EmailNotificationService") as mock_cls:
-        mock_cls.return_value.send.return_value = (False, "SES down")
+    with patch.object(EmailNotificationService, "send", return_value=(False, "SES down")):
         ok, errors = NotificationDispatcher().dispatch_to_member(member, _CLASS)
     assert ok is False
     assert "[email] SES down" in errors
