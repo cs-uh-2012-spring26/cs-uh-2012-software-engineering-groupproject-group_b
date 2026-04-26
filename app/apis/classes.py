@@ -1,4 +1,3 @@
-from datetime import datetime
 from http import HTTPStatus
 
 from flask import request
@@ -20,14 +19,15 @@ from app.db.classes import (
     ClassResource,
 )
 from app.db.users import UserResource
-
-from app.recurrence import get_recurrence_strategy, SUPPORTED_RECURRENCES
+from app.recurrence import SUPPORTED_RECURRENCES
 from app.services.auth import trainer_required
 from app.services.notifications.dispatcher import NotificationDispatcher
+from app.services.templates.recurring_class_creation import RecurringClassCreation
+from app.services.templates.standard_class_creation import StandardClassCreation
+from app.services.templates.standard_member_access import StandardMemberAccess
 
 RECURRENCE = "recurrence"
 RECURRENCE_END_DATE = "recurrence_end_date"
-MAX_OCCURRENCES = 365
 
 api = Namespace("classes", description="Endpoints for classes")
 
@@ -128,7 +128,6 @@ _MEMBER_ITEM = api.model(
     },
 )
 
-
 _FAILED_NOTIFICATION = api.model(
     "FailedNotification",
     {
@@ -157,6 +156,13 @@ _REMINDER_RESPONSE = api.model(
 @api.route("/")
 class ClassList(Resource):
 
+    """ Handles class creation and listing """
+
+    def __init__(self, api=None):
+        super().__init__(api)
+        self.class_template = StandardClassCreation()
+        self.recurring_template = RecurringClassCreation()
+
     @trainer_required
     @api.doc(security="Bearer")
     @api.expect(_CLASS_CREATE_MODEL)
@@ -170,87 +176,15 @@ class ClassList(Resource):
         data = request.json
         trainer_id = get_jwt_identity()
 
-        name = data[CLASS_NAME]
-        description = data[CLASS_DESCRIPTION]
-        trainer_name = data[TRAINER_NAME]
-        date_str = data[CLASS_DATE]
-        start_time = data[CLASS_START_TIME]
-        end_time = data[CLASS_END_TIME]
-        room_number = data[CLASS_ROOM_NUMBER]
-        capacity = data[CLASS_CAPACITY]
-
-        # capacity validation
-        if capacity < 1:
-            return {MSG: "Capacity must be at least 1"}, HTTPStatus.NOT_ACCEPTABLE
-
-        # time validation
-        try:
-            start_t = datetime.strptime(start_time, "%H:%M").time()
-            end_t = datetime.strptime(end_time, "%H:%M").time()
-        except (TypeError, ValueError):
-            return {MSG: "Invalid time format, expected HH:MM"}, HTTPStatus.NOT_ACCEPTABLE
-
-        if start_t >= end_t:
-            return {MSG: "Start time must be before end time"}, HTTPStatus.NOT_ACCEPTABLE
-
-        try:
-            date_input = datetime.strptime(date_str, "%Y-%m-%d").date()
-        except (TypeError, ValueError):
-            return {MSG: "Invalid date format, expected YYYY-MM-DD"}, HTTPStatus.NOT_ACCEPTABLE
-
-        now = datetime.now()
-        if date_input < now.date():
-            return {MSG: "Date must be today or in the future"}, HTTPStatus.NOT_ACCEPTABLE
-
-        if date_input == now.date() and start_t <= now.time():
-            return {MSG: "Start time must be in the future for today's classes"}, HTTPStatus.NOT_ACCEPTABLE
-
-        start_dt = datetime.combine(date_input, start_t)
-        end_dt = datetime.combine(date_input, end_t)
-
-
-        new_class = {
-            CLASS_NAME: name,
-            CLASS_DESCRIPTION: description,
-            TRAINER_NAME: trainer_name,
-            CLASS_DATE: date_str,
-            CLASS_START_TIME: start_time,
-            CLASS_END_TIME: end_time,
-            CLASS_ROOM_NUMBER: room_number,
-            CLASS_CAPACITY: capacity,
-            CLASS_TRAINER_ID: trainer_id,
-            CLASS_USER_IDS: [],
-        }
-
         recurrence = data.get(RECURRENCE)
-        class_resource = ClassResource()
-
         if recurrence:
-            strategy = get_recurrence_strategy(recurrence)
-            if strategy is None:
-                return {MSG: f"Invalid recurrence type '{recurrence}'. Supported: {SUPPORTED_RECURRENCES}"}, HTTPStatus.NOT_ACCEPTABLE
+            success, message, status_code, class_ids = self.recurring_template.create_recurring_class(data, trainer_id)
+            if not success:
+                return {MSG: message}, status_code
+            return {MSG: message, "class_ids": class_ids}, status_code
 
-            recurrence_end_date_str = data.get(RECURRENCE_END_DATE)
-            if not recurrence_end_date_str:
-                return {MSG: "recurrence_end_date is required when recurrence is specified"}, HTTPStatus.BAD_REQUEST
-
-            try:
-                recurrence_end = datetime.strptime(recurrence_end_date_str, "%Y-%m-%d").date()
-            except (TypeError, ValueError):
-                return {MSG: "Invalid recurrence_end_date format, expected YYYY-MM-DD"}, HTTPStatus.NOT_ACCEPTABLE
-
-            if recurrence_end < date_input:
-                return {MSG: "recurrence_end_date must be on or after the class start date"}, HTTPStatus.NOT_ACCEPTABLE
-
-            occurrence_dates = list(strategy.generate_dates(date_input, recurrence_end))
-            if len(occurrence_dates) > MAX_OCCURRENCES:
-                return {MSG: f"Recurrence generates {len(occurrence_dates)} classes, exceeding the maximum of {MAX_OCCURRENCES}"}, HTTPStatus.NOT_ACCEPTABLE
-
-            class_ids = class_resource.create_recurring_classes(new_class, occurrence_dates)
-            return {MSG: f"{len(class_ids)} recurring classes created", "class_ids": class_ids}, HTTPStatus.OK
-
-        class_id = class_resource.create_class(new_class)
-        return {MSG: f"Class created with id: {class_id}"}, HTTPStatus.OK
+        success, message, status_code, class_id = self.class_template.create_class(data, trainer_id)
+        return {MSG: message}, status_code
 
     @api.response(HTTPStatus.OK, "All upcoming classes", _CLASS_LIST_RESPONSE)
     def get(self):
@@ -272,6 +206,12 @@ class ClassList(Resource):
 @api.param("class_id", "The ID of the class")
 class ClassDetail(Resource):
 
+    """ View members enrolled in a class """
+
+    def __init__(self, api=None):
+        super().__init__(api)
+        self.class_template = StandardMemberAccess()
+
     @trainer_required
     @api.doc(security="Bearer")
     @api.response(HTTPStatus.OK, "List of enrolled members", [_MEMBER_ITEM])
@@ -280,26 +220,15 @@ class ClassDetail(Resource):
     @api.response(HTTPStatus.FORBIDDEN, "Trainer access required", _ERROR_RESPONSE)
     def get(self, class_id):
         """View the list of members enrolled in a class (trainer only)."""
-        class_resource = ClassResource()
-        fitness_class = class_resource.get_class_by_id(class_id)
-        if fitness_class is None:
-            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
+        members, error = self.class_template.get_enrolled_members(class_id)
+        if error:
+            return {MSG: error}, HTTPStatus.NOT_FOUND
 
-        user_oids = fitness_class.get("user_ids", [])
-        if not user_oids:
+        if not members:
             return []
 
-        user_resource = UserResource()
-        members = user_resource.get_users_by_ids(user_oids)
+        return members
 
-        return [
-            {
-                "name": m.get("name", ""),
-                "email": m.get("email", ""),
-                "telegram_chat_id": m.get("telegram_chat_id"),
-            }
-            for m in members
-        ]
 
 # =========================================================================
 # /classes/<class_id>/remind
@@ -309,6 +238,12 @@ class ClassDetail(Resource):
 @api.route("/<class_id>/remind")
 @api.param("class_id", "The ID of the class")
 class SendClassReminder(Resource):
+
+    """ Send reminders to enrolled members """
+
+    def __init__(self, api=None):
+        super().__init__(api)
+        self.member_access = StandardMemberAccess()
 
     @trainer_required
     @api.doc(security="Bearer")
@@ -323,22 +258,17 @@ class SendClassReminder(Resource):
         In SES sandbox mode, each recipient email must be individually verified
         in the AWS SES console before emails can be delivered.
         """
-        class_resource = ClassResource()
-        fitness_class = class_resource.get_class_by_id(class_id)
-        if fitness_class is None:
-            return {MSG: "Class not found"}, HTTPStatus.NOT_FOUND
+        members, fitness_class, error = self.member_access.get_enrolled_members_with_class(class_id)
+
+        if error:
+            return {MSG: error}, HTTPStatus.NOT_FOUND
 
         trainer_identity = get_jwt_identity()
         if fitness_class.get(CLASS_TRAINER_ID) != trainer_identity:
             return {MSG: "You are not the trainer assigned to this class"}, HTTPStatus.FORBIDDEN
 
-        user_resource = UserResource()
-
-        user_oids = fitness_class.get("user_ids", [])
-        if not user_oids:
+        if not members:
             return {MSG: "No members enrolled in this class", "sent_to": [], "failed": []}, HTTPStatus.OK
-
-        members = user_resource.get_users_by_ids(user_oids)
 
         dispatcher = NotificationDispatcher()
         successes: list[str] = []

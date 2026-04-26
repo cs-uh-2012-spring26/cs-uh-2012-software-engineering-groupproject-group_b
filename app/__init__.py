@@ -2,7 +2,7 @@ from app.apis.auth import api as auth_ns
 from app.apis.classes import api as classes_ns
 from app.apis.users import api as users_ns
 
-from app.config import Config
+from app.config import Config, TestConfig
 from app.db import DB
 
 from http import HTTPStatus
@@ -11,9 +11,9 @@ from flask_jwt_extended import JWTManager
 from flask_restx import Api
 
 
-def create_app():
+def create_app(config=Config):
     app = Flask(__name__)
-    app.config.from_object(Config)
+    app.config.from_object(config)
 
     DB.init_app(app)
     JWTManager(app)
