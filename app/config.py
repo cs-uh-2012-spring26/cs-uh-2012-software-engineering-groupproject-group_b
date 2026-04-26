@@ -31,8 +31,13 @@ class Config(object):
     TELEGRAM_BOT_TOKEN = get_required_environ("TELEGRAM_BOT_TOKEN")
 
 class TestConfig(object):
+    MONGO_URI = get_required_environ("MONGO_URI")
+    DB_NAME = get_required_environ("DB_NAME")
     MOCK_DB = True
-    MONGO_URI = "mongodb://localhost:27017"
-    DB_NAME = "test_db"
-    JWT_SECRET_KEY = get_required_environ("JWT_SECRET_KEY")
     DEBUG = True
+    JWT_SECRET_KEY = get_required_environ("JWT_SECRET_KEY")
+    AWS_ACCESS_KEY_ID = get_required_environ("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = get_required_environ("AWS_SECRET_ACCESS_KEY")
+    AWS_SES_REGION = get_required_environ("AWS_SES_REGION")
+    SES_SENDER_EMAIL = get_required_environ("SES_SENDER_EMAIL")
+    TELEGRAM_BOT_TOKEN = get_required_environ("TELEGRAM_BOT_TOKEN")
