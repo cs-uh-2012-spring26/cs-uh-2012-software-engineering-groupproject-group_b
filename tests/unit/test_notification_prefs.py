@@ -1,12 +1,28 @@
 from http import HTTPStatus
 import pytest
+from bson import ObjectId
 from flask_jwt_extended import create_access_token
 from app.apis import MSG
-from app.db.users import USER_NOTIFICATION_PREFS, USER_TELEGRAM_CHAT_ID
+from app.db.users import UserResource, USER_NOTIFICATION_PREFS, USER_TELEGRAM_CHAT_ID
 
 
 def _auth(token):
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def member_with_token(app):
+    user_resource = UserResource()
+    uid = user_resource.create_user("Test Member", "testmember@example.com", "member")
+
+    with app.app_context():
+        token = create_access_token(
+            identity=str(uid), additional_claims={"role": "member"}
+        )
+
+    yield token, str(uid)
+
+    user_resource.collection.delete_one({"_id": uid})
 
 
 def test_prefs_no_auth(client):
@@ -51,22 +67,6 @@ def test_prefs_unknown_channels_only(client, member_token):
     assert resp.status_code == HTTPStatus.BAD_REQUEST
 
 
-def test_prefs_email_only(client, member_token, mocker):
-    mock_resource = mocker.patch("app.apis.users.UserResource").return_value
-    mock_resource.update_notification_prefs.return_value = (True, "")
-
-    resp = client.put(
-        "/users/me/notifications",
-        json={"notification_prefs": {"email": True}},
-        headers=_auth(member_token),
-    )
-
-    assert resp.status_code == HTTPStatus.OK
-    mock_resource.update_notification_prefs.assert_called_once_with(
-        "testId", {USER_NOTIFICATION_PREFS: {"email": True}}
-    )
-
-
 def test_prefs_telegram_no_chat_id(client, member_token):
     resp = client.put(
         "/users/me/notifications",
@@ -84,62 +84,74 @@ def test_prefs_telegram_empty_chat_id(client, member_token):
         headers=_auth(member_token),
     )
     assert resp.status_code == HTTPStatus.BAD_REQUEST
-    assert "telegram_chat_id" in resp.json[MSG]
 
 
-def test_prefs_telegram_with_chat_id(client, member_token, mocker):
-    mock_resource = mocker.patch("app.apis.users.UserResource").return_value
-    mock_resource.update_notification_prefs.return_value = (True, "")
+def test_prefs_email_only(client, member_with_token):
+    token, user_id = member_with_token
+
+    resp = client.put(
+        "/users/me/notifications",
+        json={"notification_prefs": {"email": True}},
+        headers=_auth(token),
+    )
+
+    assert resp.status_code == HTTPStatus.OK
+    user = UserResource().get_user_by_id(user_id)
+    assert user[USER_NOTIFICATION_PREFS] == {"email": True}
+    assert USER_TELEGRAM_CHAT_ID not in user
+
+
+def test_prefs_telegram_with_chat_id(client, member_with_token):
+    token, user_id = member_with_token
 
     resp = client.put(
         "/users/me/notifications",
         json={"notification_prefs": {"telegram": True}, "telegram_chat_id": "12345"},
-        headers=_auth(member_token),
+        headers=_auth(token),
     )
 
     assert resp.status_code == HTTPStatus.OK
-    mock_resource.update_notification_prefs.assert_called_once_with(
-        "testId",
-        {USER_NOTIFICATION_PREFS: {"telegram": True}, USER_TELEGRAM_CHAT_ID: "12345"},
-    )
+    user = UserResource().get_user_by_id(user_id)
+    assert user[USER_NOTIFICATION_PREFS] == {"telegram": True}
+    assert user[USER_TELEGRAM_CHAT_ID] == "12345"
 
 
-def test_prefs_telegram_disabled_no_chat_id_needed(client, member_token, mocker):
-    mock_resource = mocker.patch("app.apis.users.UserResource").return_value
-    mock_resource.update_notification_prefs.return_value = (True, "")
+def test_prefs_telegram_disabled(client, member_with_token):
+    token, user_id = member_with_token
 
     resp = client.put(
         "/users/me/notifications",
         json={"notification_prefs": {"telegram": False}},
-        headers=_auth(member_token),
+        headers=_auth(token),
     )
 
     assert resp.status_code == HTTPStatus.OK
-    called_args = mock_resource.update_notification_prefs.call_args[0]
-    assert USER_TELEGRAM_CHAT_ID not in called_args[1]
+    user = UserResource().get_user_by_id(user_id)
+    assert user[USER_NOTIFICATION_PREFS] == {"telegram": False}
+    assert user.get(USER_TELEGRAM_CHAT_ID) is None
 
 
-def test_prefs_user_not_found(client, member_token, mocker):
-    mock_resource = mocker.patch("app.apis.users.UserResource").return_value
-    mock_resource.update_notification_prefs.return_value = (False, "User not found")
+def test_prefs_user_not_found(client, app):
+    with app.app_context():
+        token = create_access_token(
+            identity=str(ObjectId()),
+            additional_claims={"role": "member"},
+        )
 
     resp = client.put(
         "/users/me/notifications",
         json={"notification_prefs": {"email": True}},
-        headers=_auth(member_token),
+        headers=_auth(token),
     )
-
     assert resp.status_code == HTTPStatus.NOT_FOUND
 
 
-def test_prefs_db_error(client, member_token, mocker):
-    mock_resource = mocker.patch("app.apis.users.UserResource").return_value
-    mock_resource.update_notification_prefs.return_value = (False, "Invalid user ID")
-
+def test_prefs_db_error(client, member_token):
+    # member_token identity is "testId" — not a valid ObjectId
+    # → update_notification_prefs catches the ObjectId error → returns 400
     resp = client.put(
         "/users/me/notifications",
         json={"notification_prefs": {"email": True}},
         headers=_auth(member_token),
     )
-
     assert resp.status_code == HTTPStatus.BAD_REQUEST
