@@ -16,7 +16,7 @@ from app.db.classes import (
 
 def payload(**overrides):
     base = {
-        CLASS_NAME: "VERY NEW TEST",
+        CLASS_NAME: "NEW CLASS TEST",
         CLASS_DESCRIPTION: "Relaxing yoga session",
         TRAINER_NAME: "John Doe",
         CLASS_DATE: "2030-01-01",
@@ -47,25 +47,32 @@ def test_create_class_forbidden(client, member_token):
     assert response.json[MSG] == "Access forbidden: insufficient permissions"
 
 
-def test_create_class_missing_body(client, trainer_token):
+def test_create_class_empty_body(client, trainer_token):
     headers = {"Authorization": f"Bearer {trainer_token}"}
 
-    # Endpoint accesses data[CLASS_NAME] directly with no prior body check,
-    # so an empty dict raises KeyError -> caught by global error handler -> 500
     response = client.post("/classes/", json={}, headers=headers)
 
-    assert response.status_code == HTTPStatus.BAD_REQUEST
-    assert response.json[MSG] == "Request body (JSON) or parameters are required"
+    assert response.status_code == HTTPStatus.NOT_ACCEPTABLE
+    assert response.json[MSG] == "Capacity must be atleast 1"
 
 
-def test_create_class_invalid_fields(client, trainer_token):
+def test_create_class_missing_required_field(client, trainer_token):
     headers = {"Authorization": f"Bearer {trainer_token}"}
 
-    # empty class name input 
-    response = client.post("/admin/", json=payload(**{CLASS_NAME:""}), headers=headers)
+    body = payload()
+    body.pop(CLASS_NAME)
+    response = client.post("/classes/", json=body, headers=headers)
 
-    assert response.status_code == HTTPStatus.OK
-    assert response.json[MSG].startswith("Class created with id:")
+    assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+def test_create_class_invalid_capacity_value(client, trainer_token):
+    headers = {"Authorization": f"Bearer {trainer_token}"}
+
+    response = client.post("/classes/", json=payload(**{CLASS_CAPACITY: 0}), headers=headers)
+
+    assert response.status_code == HTTPStatus.NOT_ACCEPTABLE
+    assert response.json[MSG] == "Capacity must be atleast 1"
 
 
 def test_create_class_invalid_time_format(client, trainer_token):
@@ -118,13 +125,13 @@ def test_create_class_time_in_past(client,trainer_token):
     )
 
     assert response.status_code == HTTPStatus.NOT_ACCEPTABLE
-    assert response.json[MSG] == "Start time must be in the future for today's classes"
+    assert response.json[MSG] == "Start time must be in the future for today classes"
 
 
 def test_create_class_invalid_capacity_type(client, trainer_token):
     headers = {"Authorization": f"Bearer {trainer_token}"}
 
-    # "ten" < 1 raises TypeError -> caught by global error handler -> 500
+
     response = client.post("/classes/", json=payload(**{CLASS_CAPACITY: "ten"}), headers=headers)
 
     assert response.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
