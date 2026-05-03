@@ -29,6 +29,7 @@ class Config(object):
     AWS_SES_REGION = get_required_environ("AWS_SES_REGION")
     SES_SENDER_EMAIL = get_required_environ("SES_SENDER_EMAIL")
     TELEGRAM_BOT_TOKEN = get_required_environ("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_WEBHOOK_SECRET = environ.get("TELEGRAM_WEBHOOK_SECRET", "")
 
 class TestConfig(object):
     MONGO_URI = get_required_environ("MONGO_URI")
@@ -41,3 +42,4 @@ class TestConfig(object):
     AWS_SES_REGION = get_required_environ("AWS_SES_REGION")
     SES_SENDER_EMAIL = get_required_environ("SES_SENDER_EMAIL")
     TELEGRAM_BOT_TOKEN = get_required_environ("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_WEBHOOK_SECRET = environ.get("TELEGRAM_WEBHOOK_SECRET", "")

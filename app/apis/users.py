@@ -1,4 +1,9 @@
+import json
+import urllib.error
+import urllib.request
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
+from uuid import uuid4
 
 from bson import ObjectId
 from flask import request
@@ -6,6 +11,7 @@ from flask_jwt_extended import get_jwt_identity
 from flask_restx import Namespace, Resource, fields
 
 from app.apis import MSG
+from app.config import Config
 from app.db.classes import ClassResource
 from app.db.users import (
     USER_NOTIFICATION_PREFS,
@@ -72,10 +78,14 @@ _UPDATE_NOTIFICATIONS_MODEL = api.model(
             _NOTIFICATION_PREFS_MODEL,
             description="Per-channel opt-in flags (all optional)",
         ),
-        "telegram_chat_id": fields.String(
-            description="Telegram numeric chat ID — required when enabling Telegram (message @userinfobot to find yours)",
-            example="123456789",
-        ),
+    },
+)
+
+_TELEGRAM_LINK_RESPONSE = api.model(
+    "TelegramLinkResponse",
+    {
+        "link": fields.String(description="Telegram deep link to open the bot and start linking"),
+        "expires_in": fields.Integer(description="Seconds until the link expires", example=600),
     },
 )
 
@@ -172,7 +182,11 @@ class MemberNotificationPrefs(Resource):
     @api.response(HTTPStatus.NOT_FOUND, "User not found", _ERROR_RESPONSE)
     @api.response(HTTPStatus.UNAUTHORIZED, "JWT required", _ERROR_RESPONSE)
     def put(self):
-        """Update notification preferences and/or contact details for the current member."""
+        """Update notification preferences for the current member.
+
+        To enable Telegram, use GET /users/me/telegram/link instead of setting telegram=true here —
+        that flow automatically captures your chat ID via the bot.
+        """
         user_id = get_jwt_identity()
         data    = request.json or {}
 
@@ -189,15 +203,6 @@ class MemberNotificationPrefs(Resource):
 
         update_fields = {USER_NOTIFICATION_PREFS: channels}
 
-        if channels.get("telegram"):
-            telegram_chat_id = (data.get("telegram_chat_id") or "").strip()
-            if not telegram_chat_id:
-                return (
-                    {MSG: "telegram_chat_id is required when enabling Telegram"},
-                    HTTPStatus.BAD_REQUEST,
-                )
-            update_fields[USER_TELEGRAM_CHAT_ID] = telegram_chat_id
-
         user_resource = UserResource()
         ok, err = user_resource.update_notification_prefs(user_id, update_fields)
         if not ok:
@@ -205,3 +210,77 @@ class MemberNotificationPrefs(Resource):
             return {MSG: err}, status
 
         return {MSG: "Notification preferences updated"}, HTTPStatus.OK
+
+
+# =========================================================================
+# /users/me/telegram/link
+# =========================================================================
+
+
+@api.route("/me/telegram/link")
+class TelegramLink(Resource):
+
+    @member_required
+    @api.doc(security="Bearer")
+    @api.response(HTTPStatus.OK, "Deep link generated", _TELEGRAM_LINK_RESPONSE)
+    @api.response(HTTPStatus.UNAUTHORIZED, "JWT required", _ERROR_RESPONSE)
+    @api.response(HTTPStatus.INTERNAL_SERVER_ERROR, "Could not reach Telegram API", _ERROR_RESPONSE)
+    def get(self):
+        """Generate a one-time Telegram deep link that auto-captures your chat ID.
+
+        Open the returned link on your phone, press Start in Telegram, and the server
+        will automatically save your chat ID and enable Telegram notifications.
+        The link expires in 10 minutes.
+        """
+        user_id = get_jwt_identity()
+        token = str(uuid4())
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=10)
+
+        user_resource = UserResource()
+        ok = user_resource.set_telegram_link_token(user_id, token, expires_at)
+        if not ok:
+            return {MSG: "User not found"}, HTTPStatus.NOT_FOUND
+
+        try:
+            url = f"https://api.telegram.org/bot{Config.TELEGRAM_BOT_TOKEN}/getMe"
+            req = urllib.request.Request(url, method="GET")
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                bot_info = json.loads(resp.read())
+            bot_username = bot_info["result"]["username"]
+        except Exception as e:
+            return {MSG: f"Could not reach Telegram API: {e}"}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+        deep_link = f"https://t.me/{bot_username}?start={token}"
+        return {"link": deep_link, "expires_in": 600}, HTTPStatus.OK
+
+
+# =========================================================================
+# /users/telegram/webhook  (called by Telegram — no JWT auth)
+# =========================================================================
+
+
+@api.route("/telegram/webhook")
+class TelegramWebhook(Resource):
+
+    def post(self):
+        """Receive updates from Telegram. Not for direct use — called by Telegram's servers."""
+        if Config.TELEGRAM_WEBHOOK_SECRET:
+            secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+            if secret != Config.TELEGRAM_WEBHOOK_SECRET:
+                return {}, HTTPStatus.FORBIDDEN
+
+        update = request.json or {}
+        message = update.get("message", {})
+        text = message.get("text", "")
+        chat_id = str(message.get("chat", {}).get("id", ""))
+
+        if not text.startswith("/start ") or not chat_id:
+            return {}, HTTPStatus.OK
+
+        token = text[len("/start "):].strip()
+        user_resource = UserResource()
+        user = user_resource.find_user_by_link_token(token)
+        if user:
+            user_resource.save_telegram_chat_id(user["_id"], chat_id)
+
+        return {}, HTTPStatus.OK

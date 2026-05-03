@@ -1,4 +1,6 @@
 import re
+from datetime import datetime, timedelta, timezone
+from uuid import uuid4
 
 import bcrypt
 
@@ -15,6 +17,8 @@ USER_PASSWORD_HASH = "password_hash"
 USER_CLASS_IDS = "class_ids"
 USER_NOTIFICATION_PREFS = "notification_prefs"
 USER_TELEGRAM_CHAT_ID   = "telegram_chat_id"
+USER_TELEGRAM_LINK_TOKEN         = "telegram_link_token"
+USER_TELEGRAM_LINK_TOKEN_EXPIRES = "telegram_link_token_expires"
 
 # Role constants
 MEMBER_ROLE = "member"
@@ -276,3 +280,49 @@ class UserResource:
         if result.matched_count == 0:
             return False, "User not found"
         return True, ""
+
+    # ------------------------------------------------------------------
+    # Telegram linking
+    # ------------------------------------------------------------------
+
+    def set_telegram_link_token(self, user_id: str, token: str, expires_at: datetime) -> bool:
+        try:
+            user_oid = ObjectId(user_id)
+        except Exception:
+            return False
+        result = self.collection.update_one(
+            {"_id": user_oid},
+            {"$set": {
+                USER_TELEGRAM_LINK_TOKEN: token,
+                USER_TELEGRAM_LINK_TOKEN_EXPIRES: expires_at,
+            }},
+        )
+        return result.matched_count == 1
+
+    def find_user_by_link_token(self, token: str):
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        user = self.collection.find_one({
+            USER_TELEGRAM_LINK_TOKEN: token,
+            USER_TELEGRAM_LINK_TOKEN_EXPIRES: {"$gt": now},
+        })
+        return serialize_item(user)
+
+    def save_telegram_chat_id(self, user_id: str, chat_id: str) -> bool:
+        try:
+            user_oid = ObjectId(user_id)
+        except Exception:
+            return False
+        result = self.collection.update_one(
+            {"_id": user_oid},
+            {
+                "$set": {
+                    USER_TELEGRAM_CHAT_ID: chat_id,
+                    f"{USER_NOTIFICATION_PREFS}.telegram": True,
+                },
+                "$unset": {
+                    USER_TELEGRAM_LINK_TOKEN: "",
+                    USER_TELEGRAM_LINK_TOKEN_EXPIRES: "",
+                },
+            },
+        )
+        return result.matched_count == 1
