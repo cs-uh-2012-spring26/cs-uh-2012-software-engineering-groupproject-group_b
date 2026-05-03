@@ -201,9 +201,18 @@ class MemberNotificationPrefs(Resource):
                 HTTPStatus.BAD_REQUEST,
             )
 
+        user_resource = UserResource()
+
+        if channels.get("telegram"):
+            user = user_resource.get_user_by_id(user_id)
+            if not user or not user.get(USER_TELEGRAM_CHAT_ID):
+                return (
+                    {MSG: "Cannot enable Telegram: no telegram_chat_id on file. Use GET /users/me/telegram/link to link your account first."},
+                    HTTPStatus.BAD_REQUEST,
+                )
+
         update_fields = {USER_NOTIFICATION_PREFS: channels}
 
-        user_resource = UserResource()
         ok, err = user_resource.update_notification_prefs(user_id, update_fields)
         if not ok:
             status = HTTPStatus.NOT_FOUND if "not found" in err else HTTPStatus.BAD_REQUEST
