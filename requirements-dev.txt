@@ -10,3 +10,4 @@ Faker==37.5.3
 pytest-mock==3.14.0
 pytest-mock
 jsonschema
+gunicorn
