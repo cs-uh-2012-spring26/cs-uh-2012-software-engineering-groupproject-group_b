@@ -63,30 +63,42 @@ To run and test the reminder email feature, configure Amazon SES and IAM, then f
 
 ### 2.2: Telegram Bot Setup for Telegram Reminder Notifications (Feature 7)
 
-To enable Telegram reminders, you need to create a Telegram bot and obtain its token.
-
-1. Open Telegram and search for **@BotFather**.
-2. Start a chat with it and send the command `/newbot`.
-3. Follow the prompts: enter a display name (e.g. `FitClass Reminders`) then a username ending in `bot` (e.g. `fitclass_remind_bot`).
-4. BotFather will reply with an API token that looks like `123456789:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`.
-5. Copy this token and set it in your `.env` file:
+**Create the bot:**
+1. Open Telegram, search for **@BotFather**, send `/newbot`, and follow the prompts.
+2. Copy the token BotFather gives you and add it to `.env`:
    ```env
    TELEGRAM_BOT_TOKEN="your-token-here"
    ```
-6. **Start the bot** — Search for your bot by its username in Telegram and tap **Start** (or send `/start`). This is required — bots cannot message users who have never contacted them first.
-7. **Find your Chat ID** — Your Telegram Chat ID is a unique numeric identifier for your account. The easiest way to find it:
-   - Open Telegram and search for **@userinfobot**.
-   - Start a chat and send any message.
-   - It will reply with your numeric Chat ID (e.g. `123456789`).
-8. **Save your Chat ID** — Submit it to the API using `PUT /users/me/notifications`:
-   ```json
-   {
-     "telegram_chat_id": "123456789",
-     "notification_prefs": { "telegram": true }
-   }
-   ```
 
-> **Note:** If a member has not started the bot, Telegram will reject the message and the reminder will appear in the `failed` list in the API response.
+**Register the webhook (local dev only):**
+
+Members link their Telegram account by clicking a deep link, which requires Telegram to push an update to your server. Locally this needs [ngrok](https://ngrok.com) to create a public tunnel:
+
+```bash
+# Terminal 1 — run the app
+FLASK_APP=app flask run --debug --host=0.0.0.0 --port 8000
+
+# Terminal 2 — expose it publicly
+ngrok http 8000
+```
+
+Copy the `https://` URL ngrok gives you, then register it as the webhook (run once per ngrok session):
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://<your-ngrok-url>/users/telegram/webhook"}'
+```
+
+Expected response: `{"ok":true,"result":true}`.
+
+**Link a member's Telegram account:**
+
+1. Log in as a member → call `GET /users/me/telegram/link` in Swagger UI.
+2. Open the returned link on your phone → tap **Start** in Telegram.
+3. The server automatically saves your chat ID and enables Telegram notifications — no manual ID entry needed.
+
+> **Note:** The deep link expires in 10 minutes. Call `GET /users/me/telegram/link` again to get a fresh one.
 
 ### 3. Create the virtual environment and install dependencies
 

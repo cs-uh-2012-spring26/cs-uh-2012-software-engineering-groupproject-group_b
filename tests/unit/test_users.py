@@ -7,12 +7,14 @@ Endpoints covered:
   PUT  /users/me/notifications    — update notification preferences
 """
 
+import json
 import pytest
 import uuid
+from datetime import datetime, timedelta
 from http import HTTPStatus
-from flask_jwt_extended import create_access_token
-from app.db.users import UserResource
-from flask_jwt_extended import decode_token
+from unittest.mock import MagicMock, patch
+from flask_jwt_extended import create_access_token, decode_token
+from app.db.users import UserResource, USER_TELEGRAM_CHAT_ID, USER_NOTIFICATION_PREFS
 from app.apis import MSG
 
 
@@ -169,12 +171,15 @@ def test_update_notifications_email_only(client, member_auth):
     assert resp.get_json()[MSG] == "Notification preferences updated"
 
 
-def test_update_notifications_telegram_with_chat_id(client, member_auth):
-    """Enabling Telegram with a valid chat ID returns 200."""
+def test_update_notifications_telegram_with_chat_id(client, member_auth, app):
+    """Enabling Telegram succeeds when telegram_chat_id is already in the DB."""
+    with app.app_context():
+        user_id = decode_token(member_auth)["sub"]
+    UserResource().update_notification_prefs(user_id, {USER_TELEGRAM_CHAT_ID: "123456789"})
+
     headers = {"Authorization": f"Bearer {member_auth}"}
     resp = client.put("/users/me/notifications", json={
         "notification_prefs": {"telegram": True},
-        "telegram_chat_id": "123456789",
     }, headers=headers)
     assert resp.status_code == HTTPStatus.OK
     assert resp.get_json()[MSG] == "Notification preferences updated"
@@ -247,3 +252,120 @@ def test_update_notifications_persisted_in_db(client, member_auth, app):
         user = UserResource().get_user_by_id(user_id)
 
     assert user["notification_prefs"] == {"email": True}
+
+
+# ─── Tests: Generate Telegram link  (GET /users/me/telegram/link) ─────────────
+
+
+def _mock_get_me(bot_username="test_bot"):
+    mock_resp = MagicMock()
+    mock_resp.read.return_value = json.dumps(
+        {"ok": True, "result": {"username": bot_username}}
+    ).encode()
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = MagicMock(return_value=False)
+    return mock_resp
+
+
+def test_telegram_link_no_auth(client):
+    """Calling the link endpoint without a JWT returns non-200."""
+    resp = client.get("/users/me/telegram/link")
+    assert resp.status_code != HTTPStatus.OK
+
+
+def test_telegram_link_user_not_found(client, app):
+    """A JWT with a valid-format but non-existent user ID returns 404."""
+    with app.app_context():
+        token = create_access_token(
+            identity=str(__import__("bson").ObjectId()),
+            additional_claims={"role": "member"},
+        )
+    resp = client.get("/users/me/telegram/link", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == HTTPStatus.NOT_FOUND
+
+
+def test_telegram_link_success(client, member_auth):
+    """A valid member gets a deep link containing the bot username and a token."""
+    with patch("app.apis.users.urllib.request.urlopen", return_value=_mock_get_me("test_bot")):
+        resp = client.get(
+            "/users/me/telegram/link",
+            headers={"Authorization": f"Bearer {member_auth}"},
+        )
+    assert resp.status_code == HTTPStatus.OK
+    data = resp.get_json()
+    assert "https://t.me/test_bot?start=" in data["link"]
+    assert data["expires_in"] == 600
+
+
+def test_telegram_link_telegram_api_fails(client, member_auth):
+    """If the Telegram getMe call fails the endpoint returns 500."""
+    with patch("app.apis.users.urllib.request.urlopen", side_effect=Exception("timeout")):
+        resp = client.get(
+            "/users/me/telegram/link",
+            headers={"Authorization": f"Bearer {member_auth}"},
+        )
+    assert resp.status_code == HTTPStatus.INTERNAL_SERVER_ERROR
+    assert "Could not reach Telegram API" in resp.get_json()[MSG]
+
+
+# ─── Tests: Telegram webhook  (POST /users/telegram/webhook) ──────────────────
+
+
+def test_webhook_empty_body(client):
+    """An empty update body is accepted and returns 200."""
+    resp = client.post("/users/telegram/webhook", json={})
+    assert resp.status_code == HTTPStatus.OK
+
+
+def test_webhook_non_start_message(client):
+    """A regular message (not /start) is ignored and returns 200."""
+    resp = client.post("/users/telegram/webhook", json={
+        "message": {"text": "hello", "chat": {"id": 123}}
+    })
+    assert resp.status_code == HTTPStatus.OK
+
+
+def test_webhook_invalid_token(client):
+    """A /start command with an unknown token returns 200 and saves nothing."""
+    resp = client.post("/users/telegram/webhook", json={
+        "message": {"text": "/start nonexistent-token", "chat": {"id": 999}}
+    })
+    assert resp.status_code == HTTPStatus.OK
+
+
+def test_webhook_valid_token_saves_chat_id(client, member_auth, app):
+    """A /start with a valid token saves the chat_id and enables telegram in prefs."""
+    with app.app_context():
+        user_id = decode_token(member_auth)["sub"]
+
+    # Seed a valid unexpired link token directly into the DB
+    from datetime import timezone
+    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=10)
+    UserResource().set_telegram_link_token(user_id, "valid-token-abc", expires_at)
+
+    resp = client.post("/users/telegram/webhook", json={
+        "message": {"text": "/start valid-token-abc", "chat": {"id": 8888888}}
+    })
+    assert resp.status_code == HTTPStatus.OK
+
+    user = UserResource().get_user_by_id(user_id)
+    assert user[USER_TELEGRAM_CHAT_ID] == "8888888"
+    assert user[USER_NOTIFICATION_PREFS]["telegram"] is True
+
+
+def test_webhook_expired_token_does_not_save(client, member_auth, app):
+    """A /start with an expired token returns 200 but does not save the chat_id."""
+    with app.app_context():
+        user_id = decode_token(member_auth)["sub"]
+
+    from datetime import timezone
+    expired_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=1)
+    UserResource().set_telegram_link_token(user_id, "expired-token-xyz", expired_at)
+
+    resp = client.post("/users/telegram/webhook", json={
+        "message": {"text": "/start expired-token-xyz", "chat": {"id": 7777777}}
+    })
+    assert resp.status_code == HTTPStatus.OK
+
+    user = UserResource().get_user_by_id(user_id)
+    assert user.get(USER_TELEGRAM_CHAT_ID) != "7777777"

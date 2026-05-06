@@ -34,3 +34,6 @@ SES_SENDER_EMAIL="your-sender-email"
 # Create a bot via @BotFather on Telegram, then paste the token here
 TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
 
+# Telegram webhook secret — optional but recommended in production
+# Set to any random string and pass it when registering the webhook with setWebhook
+TELEGRAM_WEBHOOK_SECRET=""

@@ -3,7 +3,7 @@ import pytest
 from bson import ObjectId
 from flask_jwt_extended import create_access_token
 from app.apis import MSG
-from app.db.users import UserResource, USER_NOTIFICATION_PREFS, USER_TELEGRAM_CHAT_ID
+from app.db.users import UserResource, USER_NOTIFICATION_PREFS, USER_TELEGRAM_CHAT_ID, USER_TELEGRAM_LINK_TOKEN
 
 
 def _auth(token):
@@ -67,7 +67,8 @@ def test_prefs_unknown_channels_only(client, member_token):
     assert resp.status_code == HTTPStatus.BAD_REQUEST
 
 
-def test_prefs_telegram_no_chat_id(client, member_token):
+def test_prefs_telegram_no_chat_id_in_db(client, member_token):
+    # member_token identity is "testId" — not a valid ObjectId, get_user_by_id returns None
     resp = client.put(
         "/users/me/notifications",
         json={"notification_prefs": {"telegram": True}},
@@ -77,13 +78,16 @@ def test_prefs_telegram_no_chat_id(client, member_token):
     assert "telegram_chat_id" in resp.json[MSG]
 
 
-def test_prefs_telegram_empty_chat_id(client, member_token):
+def test_prefs_telegram_no_chat_id_real_user(client, member_with_token):
+    # Real user exists in DB but has no telegram_chat_id saved yet
+    token, _ = member_with_token
     resp = client.put(
         "/users/me/notifications",
-        json={"notification_prefs": {"telegram": True}, "telegram_chat_id": "   "},
-        headers=_auth(member_token),
+        json={"notification_prefs": {"telegram": True}},
+        headers=_auth(token),
     )
     assert resp.status_code == HTTPStatus.BAD_REQUEST
+    assert "telegram_chat_id" in resp.json[MSG]
 
 
 def test_prefs_email_only(client, member_with_token):
@@ -101,12 +105,14 @@ def test_prefs_email_only(client, member_with_token):
     assert USER_TELEGRAM_CHAT_ID not in user
 
 
-def test_prefs_telegram_with_chat_id(client, member_with_token):
+def test_prefs_telegram_enabled_with_chat_id_in_db(client, member_with_token):
+    # Simulate the linking flow: seed telegram_chat_id into DB directly
     token, user_id = member_with_token
+    UserResource().update_notification_prefs(user_id, {USER_TELEGRAM_CHAT_ID: "12345"})
 
     resp = client.put(
         "/users/me/notifications",
-        json={"notification_prefs": {"telegram": True}, "telegram_chat_id": "12345"},
+        json={"notification_prefs": {"telegram": True}},
         headers=_auth(token),
     )
 
