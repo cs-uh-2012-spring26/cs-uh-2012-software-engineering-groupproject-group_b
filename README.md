@@ -8,6 +8,7 @@ A REST API for creating and managing fitness classes, users, and class bookings.
 
 - Python 3.10 or higher
 - MongoDB installed and running. Follow [https://www.mongodb.com/docs/manual/installation/](https://www.mongodb.com/docs/manual/installation/) to install MongoDB locally.
+- Docker Desktop installed and running 
 
 ## Tech Stack
 
@@ -125,7 +126,43 @@ pytest --cov=app tests/
 ```
 
 ---
+## Running the Application with Docker 
 
+### 1. Ensure Docker is installed and running 
+
+- Install Docker Desktop [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Open it and ensure it says "Docker is running" 
+
+### 2. Set up the .env file 
+Create a `.env` file in the project root. 
+
+MONGO_URI=mongodb://mongo:27017
+DB_NAME=eventsref_dev
+MOCK_DB=false
+DEBUG=true
+JWT_SECRET_KEY=change-me-to-a-long-random-secret
+AWS_ACCESS_KEY_ID=your-access-key
+AWS_SECRET_ACCESS_KEY=your-secret-key
+AWS_SES_REGION=eu-central-1
+SES_SENDER_EMAIL=your-email
+TELEGRAM_BOT_TOKEN=your-token
+
+### 3. Run the application 
+
+docker compose up --build
+
+### 4. Access the application 
+
+Open your browser: 
+[http://localhost:8000](http://localhost:8000) 
+
+### 5. Stop the application
+
+Press Ctrl + C in the terminal, then run: 
+
+docker compose down 
+
+---
 ## Using the Swagger UI
 
 Once the server is running, open [http://127.0.0.1:8000](http://127.0.0.1:8000) in your browser to access the interactive Swagger UI.
