@@ -31,4 +31,4 @@ jobs:
           command_timeout: 30m
           script: |
             cd ~/prod/
-            docker compose up --build -d
+            docker compose up --build -d --remove-orphans
