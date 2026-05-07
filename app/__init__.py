@@ -10,6 +10,8 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_restx import Api
 from flask_jwt_extended.exceptions import NoAuthorizationError
+from flask import send_from_directory
+
 
 def create_app(config=Config):
     app = Flask(__name__)
@@ -31,6 +33,14 @@ def create_app(config=Config):
             }
         },
     )
+
+    @app.route('/')
+    def index():
+        return send_from_directory('frontend', 'login.html')
+
+    @app.route('/<path:filename>')
+    def serve_frontend(filename):
+        return send_from_directory('frontend', filename)
 
     api.init_app(app)
     api.add_namespace(auth_ns)

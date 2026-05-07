@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Fitness Club</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <h1>Create account</h1>
+        <form id="registerForm">
+            <label>Name</label>
+            <input type="text" id="name" required>
+
+            <label>Email</label>
+            <input type="email" id="email" required>
+
+            <label>Password</label>
+            <input type="password" id="password" required>
+            <small>10-128 chars, uppercase, lowercase, digit, special character</small>
+
+            <label>Role</label>
+            <select id="role" required>
+                <option value="">Select...</option>
+                <option value="member">Member</option>
+                <option value="trainer">Trainer</option>
+            </select>
+
+            <div id="message"></div>
+            <button type="submit">Register</button>
+        </form>
+        <p>Have an account? <a href="login.html">Login</a></p>
+    </div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const msg = document.getElementById('message');
+            const res = await fetch('/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('name').value,
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value,
+                    role: document.getElementById('role').value
+                })
+            });
+
+            const data = await res.json();
+            msg.className = res.ok ? 'success' : 'error';
+            msg.textContent = data.msg;
+
+            if (res.ok) setTimeout(() => window.location = 'login.html', 1500);
+
+        });
+    </script>
+</body>
+
+</html>
