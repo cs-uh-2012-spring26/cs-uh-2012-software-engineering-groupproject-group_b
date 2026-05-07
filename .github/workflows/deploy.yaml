@@ -15,7 +15,7 @@ jobs:
       - name: Copy file via ssh password
         uses: appleboy/scp-action@v0.1.4
         with:
-          host: ${{ secrets.VM_IP }}
+          host: ${{ vars.VM_IP }}
           username: ${{ secrets.SSH_USERNAME}}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "."
@@ -24,7 +24,7 @@ jobs:
       - name: Deploy
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.VM_IP }}
+          host: ${{ vars.VM_IP }}
           username: ${{ secrets.SSH_USERNAME}}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
