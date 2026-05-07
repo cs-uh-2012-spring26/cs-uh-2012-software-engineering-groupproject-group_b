@@ -28,6 +28,7 @@ jobs:
           host: ${{ vars.VM_IP }}
           username: ${{ secrets.SSH_USERNAME}}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 30m
           script: |
             cd ~/prod/
             docker compose up --build -d
