@@ -154,7 +154,7 @@ docker compose up --build
 ### 4. Access the application 
 
 Open your browser: 
-[http://localhost:8000](http://localhost:8000) 
+[http://localhost:80](http://localhost:80) 
 
 ### 5. Stop the application
 
