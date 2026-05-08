@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Settings – FitClass</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page">
+    <div class="page-header">
+      <h1>Notification Settings</h1>
+      <p>Choose how you receive class reminders</p>
+    </div>
+
+    <div style="max-width:540px">
+      <div id="msg" class="msg" style="display:none"></div>
+
+      <!-- Email notifications -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="section-title" style="margin-bottom:16px">Notification Channels</div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <h3>Email Reminders</h3>
+            <p>Receive class reminders by email</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="email-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <h3>Telegram Reminders</h3>
+            <p>Receive reminders via Telegram bot</p>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="telegram-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <div style="margin-top:20px">
+          <button class="btn btn-primary" onclick="savePrefs()">Save Preferences</button>
+        </div>
+      </div>
+
+      <!-- Telegram linking -->
+      <div class="card">
+        <div class="section-title" style="margin-bottom:4px">Connect Telegram</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">
+          To receive Telegram reminders, link your account first. Click the button below,
+          open the link on your phone, and press Start in Telegram.
+        </p>
+
+        <div id="tg-msg" class="msg" style="display:none"></div>
+
+        <button class="btn btn-ghost" id="tg-btn" onclick="connectTelegram()">
+          Get Telegram Link
+        </button>
+
+        <div id="tg-link-box" style="display:none">
+          <div class="link-box" id="tg-link"></div>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">
+            This link expires in 10 minutes. Open it on your phone in Telegram.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    renderNav('settings');
+
+    if (!requireAuth('member')) {
+      throw new Error('not authenticated');
+    }
+
+    async function savePrefs() {
+      const msgEl    = document.getElementById('msg');
+      const emailOn  = document.getElementById('email-toggle').checked;
+      const tgOn     = document.getElementById('telegram-toggle').checked;
+      hideMsg(msgEl);
+
+      try {
+        await apiFetch('/users/me/notifications', {
+          method: 'PUT',
+          body: JSON.stringify({
+            notification_prefs: { email: emailOn, telegram: tgOn },
+          }),
+        });
+        showMsg(msgEl, 'Preferences saved.', 'success');
+      } catch (err) {
+        showMsg(msgEl, err.message);
+      }
+    }
+
+    async function connectTelegram() {
+      const tgMsg     = document.getElementById('tg-msg');
+      const tgBtn     = document.getElementById('tg-btn');
+      const linkBox   = document.getElementById('tg-link-box');
+      const linkEl    = document.getElementById('tg-link');
+      hideMsg(tgMsg);
+      linkBox.style.display = 'none';
+      tgBtn.disabled = true;
+      tgBtn.textContent = 'Generating…';
+
+      try {
+        const data = await apiFetch('/users/me/telegram/link');
+        linkEl.textContent = data.link;
+        linkBox.style.display = 'block';
+      } catch (err) {
+        showMsg(tgMsg, err.message);
+      } finally {
+        tgBtn.disabled = false;
+        tgBtn.textContent = 'Get Telegram Link';
+      }
+    }
+  </script>
+</body>
+</html>

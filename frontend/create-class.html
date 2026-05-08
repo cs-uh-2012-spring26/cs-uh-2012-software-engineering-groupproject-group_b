@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Class – FitClass</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page">
+    <div class="page-header">
+      <h1>Create Class</h1>
+      <p>POST /classes/</p>
+    </div>
+
+    <div style="max-width:520px">
+      <div id="msg" class="msg" style="display:none"></div>
+      <div class="card">
+        <form id="form">
+
+          <div class="form-group">
+            <label class="form-label" for="name">name</label>
+            <input id="name" class="form-input" type="text" placeholder="e.g. Morning Yoga" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="description">description</label>
+            <textarea id="description" class="form-input" placeholder="Brief description" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="trainer_name">trainer_name</label>
+            <input id="trainer_name" class="form-input" type="text" placeholder="Trainer's name" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="date">date <span class="form-hint" style="display:inline">(YYYY-MM-DD)</span></label>
+            <input id="date" class="form-input" type="date" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="start_time">start_time <span class="form-hint" style="display:inline">(HH:MM)</span></label>
+              <input id="start_time" class="form-input" type="time" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="end_time">end_time <span class="form-hint" style="display:inline">(HH:MM)</span></label>
+              <input id="end_time" class="form-input" type="time" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="room_number">room_number</label>
+              <input id="room_number" class="form-input" type="text" placeholder="e.g. 101" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="capacity">capacity</label>
+              <input id="capacity" class="form-input" type="number" min="1" placeholder="e.g. 20" required>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <div class="form-group">
+            <label class="form-label" for="recurrence">recurrence <span class="form-hint" style="display:inline">(optional)</span></label>
+            <select id="recurrence" class="form-input">
+              <option value="">— none (one-off class) —</option>
+              <option value="daily">daily</option>
+              <option value="weekly">weekly</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="recurrence_end_date">recurrence_end_date <span class="form-hint" style="display:inline">(YYYY-MM-DD, required if recurring)</span></label>
+            <input id="recurrence_end_date" class="form-input" type="date">
+          </div>
+
+          <button type="submit" id="btn" class="btn btn-primary btn-full">Create Class</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    renderNav('create-class');
+    if (!requireAuth('trainer')) throw new Error('not authenticated');
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').min = today;
+    document.getElementById('recurrence_end_date').min = today;
+
+    const savedName = getName();
+    if (savedName) document.getElementById('trainer_name').value = savedName;
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msgEl = document.getElementById('msg');
+      const btn   = document.getElementById('btn');
+      hideMsg(msgEl);
+
+      const body = {
+        name:         document.getElementById('name').value.trim(),
+        description:  document.getElementById('description').value.trim(),
+        trainer_name: document.getElementById('trainer_name').value.trim(),
+        date:         document.getElementById('date').value,
+        start_time:   document.getElementById('start_time').value,
+        end_time:     document.getElementById('end_time').value,
+        room_number:  document.getElementById('room_number').value.trim(),
+        capacity:     parseInt(document.getElementById('capacity').value, 10),
+      };
+
+      const recurrence = document.getElementById('recurrence').value;
+      if (recurrence) {
+        body.recurrence = recurrence;
+        body.recurrence_end_date = document.getElementById('recurrence_end_date').value;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+
+      try {
+        const data = await apiFetch('/classes/', { method: 'POST', body: JSON.stringify(body) });
+        showMsg(msgEl, data.message, 'success');
+        e.target.reset();
+        if (savedName) document.getElementById('trainer_name').value = savedName;
+      } catch (err) {
+        showMsg(msgEl, err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Class';
+      }
+    });
+  </script>
+</body>
+</html>
