@@ -236,7 +236,9 @@ deactivate
 ```
 
 ---
+## Deployed URL for Swagger UI
 
+http://167.99.253.69/
 
 ## Member Responsibilities 
 
