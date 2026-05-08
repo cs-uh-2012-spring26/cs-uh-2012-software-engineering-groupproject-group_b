@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Class Members – FitClass</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page">
+    <a href="classes.html" class="back-link">&#8592; Back to Classes</a>
+
+    <div class="page-header">
+      <h1 id="page-title">Class Members</h1>
+      <p id="page-subtitle">Members enrolled in this class</p>
+    </div>
+
+    <div id="msg" class="msg" style="display:none"></div>
+
+    <div class="section-header">
+      <span class="section-title">Enrolled Members</span>
+      <button id="remind-btn" class="btn btn-primary btn-sm" onclick="sendReminder()" style="display:none">
+        Send Reminder
+      </button>
+    </div>
+
+    <div id="content">
+      <div class="loading">Loading members…</div>
+    </div>
+
+    <div id="remind-msg" class="msg" style="display:none;margin-top:16px"></div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    renderNav('');
+
+    if (!requireAuth('trainer')) {
+      throw new Error('not authenticated');
+    }
+
+    // Read class ID and name from URL query params
+    const params  = new URLSearchParams(window.location.search);
+    const classId = params.get('id');
+    const className = params.get('name') ? decodeURIComponent(params.get('name')) : 'Class';
+
+    document.getElementById('page-title').textContent = className;
+    document.getElementById('page-subtitle').textContent = `Members enrolled in ${className}`;
+
+    if (!classId) {
+      document.getElementById('content').innerHTML =
+        '<div class="empty"><div class="empty-title">No class ID provided.</div></div>';
+    } else {
+      loadMembers();
+    }
+
+    async function loadMembers() {
+      const content    = document.getElementById('content');
+      const msgEl      = document.getElementById('msg');
+      const remindBtn  = document.getElementById('remind-btn');
+
+      try {
+        const members = await apiFetch(`/classes/${classId}/members`);
+
+        if (!members || members.length === 0) {
+          content.innerHTML = `
+            <div class="empty">
+              <div class="empty-icon">&#128101;</div>
+              <div class="empty-title">No members enrolled yet</div>
+              <p>Members will appear here once they book this class.</p>
+            </div>`;
+          return;
+        }
+
+        remindBtn.style.display = 'inline-flex';
+
+        content.innerHTML = `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Telegram</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${members.map(m => `
+                  <tr>
+                    <td>${esc(m.name)}</td>
+                    <td>${esc(m.email)}</td>
+                    <td>${m.telegram_chat_id
+                      ? `<span class="badge badge-success">Connected</span>`
+                      : `<span class="badge badge-muted">Not connected</span>`}
+                    </td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (err) {
+        showMsg(msgEl, err.message);
+        content.innerHTML = '';
+      }
+    }
+
+    async function sendReminder() {
+      const btn     = document.getElementById('remind-btn');
+      const remMsg  = document.getElementById('remind-msg');
+      hideMsg(remMsg);
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+
+      try {
+        const data = await apiFetch(`/classes/${classId}/remind`, { method: 'POST' });
+        const sent    = data.sent_to?.length ?? 0;
+        const failed  = data.failed?.length ?? 0;
+        const detail  = failed > 0 ? ` (${failed} failed)` : '';
+        showMsg(remMsg, `Reminders sent to ${sent} member${sent !== 1 ? 's' : ''}${detail}.`, 'success');
+      } catch (err) {
+        showMsg(remMsg, err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send Reminder';
+      }
+    }
+  </script>
+</body>
+</html>

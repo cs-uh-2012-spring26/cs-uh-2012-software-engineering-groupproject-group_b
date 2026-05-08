@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Classes – FitClass</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page">
+    <div class="page-header">
+      <h1>My Classes</h1>
+      <p>Classes you have booked</p>
+    </div>
+
+    <div id="msg" class="msg" style="display:none"></div>
+    <div id="content">
+      <div class="loading">Loading your classes…</div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    renderNav('my-classes');
+
+    if (!requireAuth('member')) {
+      // requireAuth already redirected — stop execution
+      throw new Error('not authenticated');
+    }
+
+    async function init() {
+      const content = document.getElementById('content');
+      const msgEl   = document.getElementById('msg');
+
+      try {
+        const classes = await apiFetch('/users/me/book');
+
+        if (!classes || classes.length === 0) {
+          content.innerHTML = `
+            <div class="empty">
+              <div class="empty-icon">🗓️</div>
+              <div class="empty-title">No classes booked yet</div>
+              <p><a href="classes.html" style="color:var(--primary)">Browse upcoming classes</a> to get started.</p>
+            </div>`;
+          return;
+        }
+
+        content.innerHTML = `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Class</th>
+                  <th>Trainer</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Room</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${classes.map(c => `
+                  <tr>
+                    <td>
+                      <div style="font-weight:600">${esc(c.name)}</div>
+                      <div style="font-size:13px;color:var(--muted);margin-top:2px">${esc(c.description)}</div>
+                    </td>
+                    <td>${esc(c.trainer_name)}</td>
+                    <td>${formatDate(c.date)}</td>
+                    <td>${esc(c.start_time)} – ${esc(c.end_time)}</td>
+                    <td>Room ${esc(c.room_number)}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (err) {
+        showMsg(msgEl, err.message);
+        content.innerHTML = '';
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

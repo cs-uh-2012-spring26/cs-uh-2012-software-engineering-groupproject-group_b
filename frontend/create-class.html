@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Class – FitClass</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page">
+    <div class="page-header">
+      <h1>Create a Class</h1>
+      <p>Fill in the details for your new fitness class</p>
+    </div>
+
+    <div style="max-width:620px">
+      <div id="msg" class="msg" style="display:none"></div>
+
+      <div class="card">
+        <form id="form" novalidate>
+
+          <div class="form-group">
+            <label class="form-label" for="name">Class Name</label>
+            <input id="name" class="form-input" type="text" placeholder="e.g. Morning Yoga" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="description">Description</label>
+            <textarea id="description" class="form-input" placeholder="Brief description of the class" required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="trainer_name">Trainer Name</label>
+            <input id="trainer_name" class="form-input" type="text" placeholder="Your name" required>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="date">Date</label>
+              <input id="date" class="form-input" type="date" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="room_number">Room</label>
+              <input id="room_number" class="form-input" type="text" placeholder="e.g. 101" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="start_time">Start Time</label>
+              <input id="start_time" class="form-input" type="time" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="end_time">End Time</label>
+              <input id="end_time" class="form-input" type="time" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="capacity">Capacity</label>
+            <input id="capacity" class="form-input" type="number" min="1" placeholder="e.g. 20" required>
+          </div>
+
+          <hr class="divider">
+
+          <!-- Recurring class toggle -->
+          <div class="form-group" style="flex-direction:row;align-items:center;gap:10px;margin-bottom:0">
+            <label class="toggle" style="margin-top:2px">
+              <input type="checkbox" id="recurring-toggle" onchange="toggleRecurring(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+            <div>
+              <div style="font-size:14px;font-weight:500">Recurring class</div>
+              <div style="font-size:13px;color:var(--muted)">Repeat this class on a weekly schedule</div>
+            </div>
+          </div>
+
+          <div id="recurrence-fields" style="display:none;margin-top:18px">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="recurrence">Recurrence</label>
+                <select id="recurrence" class="form-input">
+                  <option value="weekly">Weekly</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="recurrence_end_date">Repeat Until</label>
+                <input id="recurrence_end_date" class="form-input" type="date">
+                <span class="form-hint">Last date (inclusive) for the series</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top:24px">
+            <button type="submit" class="btn btn-primary btn-full" id="submit-btn">Create Class</button>
+          </div>
+
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    renderNav('create-class');
+
+    if (!requireAuth('trainer')) {
+      throw new Error('not authenticated');
+    }
+
+    // Set minimum date to today
+    document.getElementById('date').min = new Date().toISOString().split('T')[0];
+    document.getElementById('recurrence_end_date').min = new Date().toISOString().split('T')[0];
+
+    // Pre-fill trainer name from localStorage if saved
+    const savedName = getName();
+    if (savedName) document.getElementById('trainer_name').value = savedName;
+
+    function toggleRecurring(isOn) {
+      document.getElementById('recurrence-fields').style.display = isOn ? 'block' : 'none';
+    }
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const msgEl  = document.getElementById('msg');
+      const btn    = document.getElementById('submit-btn');
+      hideMsg(msgEl);
+
+      const isRecurring = document.getElementById('recurring-toggle').checked;
+
+      const body = {
+        name:         document.getElementById('name').value.trim(),
+        description:  document.getElementById('description').value.trim(),
+        trainer_name: document.getElementById('trainer_name').value.trim(),
+        date:         document.getElementById('date').value,
+        start_time:   document.getElementById('start_time').value,
+        end_time:     document.getElementById('end_time').value,
+        room_number:  document.getElementById('room_number').value.trim(),
+        capacity:     parseInt(document.getElementById('capacity').value, 10),
+      };
+
+      if (isRecurring) {
+        body.recurrence = document.getElementById('recurrence').value;
+        body.recurrence_end_date = document.getElementById('recurrence_end_date').value;
+      }
+
+      // Basic client-side validation
+      if (!body.name || !body.description || !body.trainer_name || !body.date || !body.start_time || !body.end_time || !body.room_number || !body.capacity) {
+        showMsg(msgEl, 'Please fill in all required fields.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Creating…';
+
+      try {
+        const data = await apiFetch('/classes/', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        showMsg(msgEl, data.message || 'Class created successfully!', 'success');
+        e.target.reset();
+        document.getElementById('recurrence-fields').style.display = 'none';
+        if (savedName) document.getElementById('trainer_name').value = savedName;
+      } catch (err) {
+        showMsg(msgEl, err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Create Class';
+      }
+    });
+  </script>
+</body>
+</html>

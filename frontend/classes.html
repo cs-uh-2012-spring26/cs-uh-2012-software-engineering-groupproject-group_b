@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Classes – FitClass</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page">
+    <div class="page-header">
+      <h1>Upcoming Classes</h1>
+      <p>Browse and book fitness classes</p>
+    </div>
+
+    <div id="msg" class="msg" style="display:none"></div>
+    <div id="grid" class="class-grid">
+      <div class="loading">Loading classes…</div>
+    </div>
+  </main>
+
+  <script src="js/api.js"></script>
+  <script>
+    renderNav('classes');
+
+    async function init() {
+      const grid = document.getElementById('grid');
+      const msgEl = document.getElementById('msg');
+
+      try {
+        const data = await apiFetch('/classes/');
+        const classes = data.classes || [];
+
+        // For members, fetch their enrolled class IDs to show booking status
+        let enrolledIds = new Set();
+        if (isLoggedIn() && getRole() === 'member') {
+          try {
+            const enrolled = await apiFetch('/users/me/book');
+            enrolledIds = new Set((enrolled || []).map(c => c._id));
+          } catch {
+            // Non-fatal: book buttons will still show, booking will catch duplicates
+          }
+        }
+
+        if (classes.length === 0) {
+          grid.innerHTML = `
+            <div class="empty" style="grid-column:1/-1">
+              <div class="empty-icon">📅</div>
+              <div class="empty-title">No upcoming classes</div>
+              <p>Check back later for new sessions.</p>
+            </div>`;
+          return;
+        }
+
+        grid.innerHTML = classes.map(c => renderCard(c, enrolledIds)).join('');
+      } catch (err) {
+        showMsg(msgEl, err.message);
+        grid.innerHTML = '';
+      }
+    }
+
+    function renderCard(cls, enrolledIds) {
+      const role = getRole();
+      let action;
+
+      if (isLoggedIn() && role === 'member') {
+        if (enrolledIds.has(cls._id)) {
+          action = `<span class="badge badge-success">&#10003; Booked</span>`;
+        } else {
+          action = `<button class="btn btn-primary btn-sm" onclick="bookClass('${esc(cls._id)}', this)">Book Class</button>`;
+        }
+      } else if (isLoggedIn() && role === 'trainer') {
+        const nameParam = encodeURIComponent(cls.name || '');
+        action = `<a href="class-members.html?id=${esc(cls._id)}&name=${nameParam}" class="btn btn-outline btn-sm">View Members</a>`;
+      } else {
+        action = `<a href="login.html" class="btn btn-ghost btn-sm">Log in to book</a>`;
+      }
+
+      return `
+        <div class="class-card" id="card-${esc(cls._id)}">
+          <div>
+            <div class="class-card-title">${esc(cls.name)}</div>
+            <div class="class-card-desc" style="margin-top:4px">${esc(cls.description)}</div>
+          </div>
+          <div class="class-card-meta">
+            <span>&#128100; ${esc(cls.trainer_name)}</span>
+            <span>&#128197; ${formatDate(cls.date)}</span>
+            <span>&#128336; ${esc(cls.start_time)} – ${esc(cls.end_time)}</span>
+            <span>&#128205; Room ${esc(cls.room_number)}</span>
+            <span>&#128101; ${esc(cls.capacity)} spots</span>
+          </div>
+          <div class="class-card-footer">${action}</div>
+        </div>`;
+    }
+
+    async function bookClass(classId, btn) {
+      const msgEl = document.getElementById('msg');
+      hideMsg(msgEl);
+      btn.disabled = true;
+      btn.textContent = 'Booking…';
+
+      try {
+        await apiFetch(`/users/me/book/${classId}`, { method: 'POST' });
+        // Replace the button with a "Booked" badge in place
+        const badge = document.createElement('span');
+        badge.className = 'badge badge-success';
+        badge.textContent = '✓ Booked';
+        btn.replaceWith(badge);
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = 'Book Class';
+        showMsg(msgEl, err.message);
+        setTimeout(() => hideMsg(msgEl), 5000);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
