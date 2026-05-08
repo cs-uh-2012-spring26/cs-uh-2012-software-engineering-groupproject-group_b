@@ -27,7 +27,7 @@ jobs:
       - name: Run tests with coverage
         env:
           MONGO_URI: ${{ vars.MONGO_URI }}
-          DB_NAME: ${{ vars.DB_NAME }}
+          DB_NAME: ${{ secrets.DB_NAME }}
           MOCK_DB: ${{ vars.MOCK_DB }}
           DEBUG: ${{ vars.DEBUG }}
           JWT_SECRET_KEY: ${{ secrets.JWT_SECRET_KEY }}

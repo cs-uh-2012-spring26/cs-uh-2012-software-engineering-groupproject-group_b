@@ -22,6 +22,23 @@ jobs:
           source: "."
           target: "~/prod"
 
+      - name: Create .env file on VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ vars.VM_IP }}
+          username: ${{ secrets.SSH_USERNAME}}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cat > ~/prod/.env <<EOF
+            DB_NAME=${{ secrets.DB_NAME }}
+            JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_SES_REGION=${{ secrets.AWS_SES_REGION }}
+            SES_SENDER_EMAIL=${{ secrets.SES_SENDER_EMAIL }}
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            EOF
+
       - name: Deploy
         uses: appleboy/ssh-action@v1.0.0
         with:
