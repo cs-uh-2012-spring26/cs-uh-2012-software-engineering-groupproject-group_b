@@ -9,92 +9,74 @@
 <body>
   <main class="page">
     <div class="page-header">
-      <h1>Create a Class</h1>
-      <p>Fill in the details for your new fitness class</p>
+      <h1>Create Class</h1>
+      <p>POST /classes/</p>
     </div>
 
-    <div style="max-width:620px">
+    <div style="max-width:520px">
       <div id="msg" class="msg" style="display:none"></div>
-
       <div class="card">
-        <form id="form" novalidate>
+        <form id="form">
 
           <div class="form-group">
-            <label class="form-label" for="name">Class Name</label>
+            <label class="form-label" for="name">name</label>
             <input id="name" class="form-input" type="text" placeholder="e.g. Morning Yoga" required>
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="description">Description</label>
-            <textarea id="description" class="form-input" placeholder="Brief description of the class" required></textarea>
+            <label class="form-label" for="description">description</label>
+            <textarea id="description" class="form-input" placeholder="Brief description" required></textarea>
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="trainer_name">Trainer Name</label>
-            <input id="trainer_name" class="form-input" type="text" placeholder="Your name" required>
+            <label class="form-label" for="trainer_name">trainer_name</label>
+            <input id="trainer_name" class="form-input" type="text" placeholder="Trainer's name" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="date">date <span class="form-hint" style="display:inline">(YYYY-MM-DD)</span></label>
+            <input id="date" class="form-input" type="date" required>
           </div>
 
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label" for="date">Date</label>
-              <input id="date" class="form-input" type="date" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="room_number">Room</label>
-              <input id="room_number" class="form-input" type="text" placeholder="e.g. 101" required>
-            </div>
-          </div>
-
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="start_time">Start Time</label>
+              <label class="form-label" for="start_time">start_time <span class="form-hint" style="display:inline">(HH:MM)</span></label>
               <input id="start_time" class="form-input" type="time" required>
             </div>
             <div class="form-group">
-              <label class="form-label" for="end_time">End Time</label>
+              <label class="form-label" for="end_time">end_time <span class="form-hint" style="display:inline">(HH:MM)</span></label>
               <input id="end_time" class="form-input" type="time" required>
             </div>
           </div>
 
-          <div class="form-group">
-            <label class="form-label" for="capacity">Capacity</label>
-            <input id="capacity" class="form-input" type="number" min="1" placeholder="e.g. 20" required>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="room_number">room_number</label>
+              <input id="room_number" class="form-input" type="text" placeholder="e.g. 101" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="capacity">capacity</label>
+              <input id="capacity" class="form-input" type="number" min="1" placeholder="e.g. 20" required>
+            </div>
           </div>
 
           <hr class="divider">
 
-          <!-- Recurring class toggle -->
-          <div class="form-group" style="flex-direction:row;align-items:center;gap:10px;margin-bottom:0">
-            <label class="toggle" style="margin-top:2px">
-              <input type="checkbox" id="recurring-toggle" onchange="toggleRecurring(this.checked)">
-              <span class="toggle-slider"></span>
-            </label>
-            <div>
-              <div style="font-size:14px;font-weight:500">Recurring class</div>
-              <div style="font-size:13px;color:var(--muted)">Repeat this class on a weekly schedule</div>
-            </div>
+          <div class="form-group">
+            <label class="form-label" for="recurrence">recurrence <span class="form-hint" style="display:inline">(optional)</span></label>
+            <select id="recurrence" class="form-input">
+              <option value="">— none (one-off class) —</option>
+              <option value="daily">daily</option>
+              <option value="weekly">weekly</option>
+            </select>
           </div>
 
-          <div id="recurrence-fields" style="display:none;margin-top:18px">
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label" for="recurrence">Recurrence</label>
-                <select id="recurrence" class="form-input">
-                  <option value="weekly">Weekly</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label" for="recurrence_end_date">Repeat Until</label>
-                <input id="recurrence_end_date" class="form-input" type="date">
-                <span class="form-hint">Last date (inclusive) for the series</span>
-              </div>
-            </div>
+          <div class="form-group">
+            <label class="form-label" for="recurrence_end_date">recurrence_end_date <span class="form-hint" style="display:inline">(YYYY-MM-DD, required if recurring)</span></label>
+            <input id="recurrence_end_date" class="form-input" type="date">
           </div>
 
-          <div style="margin-top:24px">
-            <button type="submit" class="btn btn-primary btn-full" id="submit-btn">Create Class</button>
-          </div>
-
+          <button type="submit" id="btn" class="btn btn-primary btn-full">Create Class</button>
         </form>
       </div>
     </div>
@@ -103,31 +85,20 @@
   <script src="js/api.js"></script>
   <script>
     renderNav('create-class');
+    if (!requireAuth('trainer')) throw new Error('not authenticated');
 
-    if (!requireAuth('trainer')) {
-      throw new Error('not authenticated');
-    }
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').min = today;
+    document.getElementById('recurrence_end_date').min = today;
 
-    // Set minimum date to today
-    document.getElementById('date').min = new Date().toISOString().split('T')[0];
-    document.getElementById('recurrence_end_date').min = new Date().toISOString().split('T')[0];
-
-    // Pre-fill trainer name from localStorage if saved
     const savedName = getName();
     if (savedName) document.getElementById('trainer_name').value = savedName;
 
-    function toggleRecurring(isOn) {
-      document.getElementById('recurrence-fields').style.display = isOn ? 'block' : 'none';
-    }
-
     document.getElementById('form').addEventListener('submit', async (e) => {
       e.preventDefault();
-
-      const msgEl  = document.getElementById('msg');
-      const btn    = document.getElementById('submit-btn');
+      const msgEl = document.getElementById('msg');
+      const btn   = document.getElementById('btn');
       hideMsg(msgEl);
-
-      const isRecurring = document.getElementById('recurring-toggle').checked;
 
       const body = {
         name:         document.getElementById('name').value.trim(),
@@ -140,28 +111,19 @@
         capacity:     parseInt(document.getElementById('capacity').value, 10),
       };
 
-      if (isRecurring) {
-        body.recurrence = document.getElementById('recurrence').value;
+      const recurrence = document.getElementById('recurrence').value;
+      if (recurrence) {
+        body.recurrence = recurrence;
         body.recurrence_end_date = document.getElementById('recurrence_end_date').value;
-      }
-
-      // Basic client-side validation
-      if (!body.name || !body.description || !body.trainer_name || !body.date || !body.start_time || !body.end_time || !body.room_number || !body.capacity) {
-        showMsg(msgEl, 'Please fill in all required fields.');
-        return;
       }
 
       btn.disabled = true;
       btn.textContent = 'Creating…';
 
       try {
-        const data = await apiFetch('/classes/', {
-          method: 'POST',
-          body: JSON.stringify(body),
-        });
-        showMsg(msgEl, data.message || 'Class created successfully!', 'success');
+        const data = await apiFetch('/classes/', { method: 'POST', body: JSON.stringify(body) });
+        showMsg(msgEl, data.message, 'success');
         e.target.reset();
-        document.getElementById('recurrence-fields').style.display = 'none';
         if (savedName) document.getElementById('trainer_name').value = savedName;
       } catch (err) {
         showMsg(msgEl, err.message);

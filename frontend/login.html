@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login – FitClass</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .auth-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .auth-card { width:100%; max-width:400px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:36px 32px; }
+    .auth-brand { font-size:20px; font-weight:700; color:var(--primary); margin-bottom:24px; display:block; text-decoration:none; }
+    .auth-title { font-size:20px; font-weight:700; margin-bottom:28px; }
+    .auth-footer { text-align:center; font-size:13px; color:var(--muted); margin-top:20px; }
+    .auth-footer a { color:var(--primary); text-decoration:none; font-weight:500; }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <a href="classes.html" class="auth-brand">FitClass</a>
+      <div class="auth-title">Login</div>
+
+      <div id="msg" class="msg" style="display:none"></div>
+
+      <form id="form">
+        <div class="form-group">
+          <label class="form-label" for="email">email</label>
+          <input id="email" type="email" class="form-input" placeholder="jane@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">password</label>
+          <input id="password" type="password" class="form-input" required>
+        </div>
+        <button type="submit" id="btn" class="btn btn-primary btn-full">Login</button>
+      </form>
+
+      <div class="auth-footer">No account? <a href="register.html">Register</a></div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    if (isLoggedIn()) window.location.href = 'classes.html';
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msgEl = document.getElementById('msg');
+      const btn   = document.getElementById('btn');
+      hideMsg(msgEl);
+      btn.disabled = true;
+      btn.textContent = 'Logging in…';
+
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      try {
+        const data = await apiFetch('/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
+        saveLoginData(data.access_token, '');
+        window.location.href = 'classes.html';
+      } catch (err) {
+        showMsg(msgEl, err.message);
+        btn.disabled = false;
+        btn.textContent = 'Login';
+      }
+    });
+  </script>
+</body>
+</html>

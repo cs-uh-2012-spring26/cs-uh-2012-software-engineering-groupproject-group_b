@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register – FitClass</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .auth-wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .auth-card { width:100%; max-width:400px; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:36px 32px; }
+    .auth-brand { font-size:20px; font-weight:700; color:var(--primary); margin-bottom:24px; display:block; text-decoration:none; }
+    .auth-title { font-size:20px; font-weight:700; margin-bottom:28px; }
+    .auth-footer { text-align:center; font-size:13px; color:var(--muted); margin-top:20px; }
+    .auth-footer a { color:var(--primary); text-decoration:none; font-weight:500; }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <div class="auth-card">
+      <a href="classes.html" class="auth-brand">FitClass</a>
+      <div class="auth-title">Register</div>
+
+      <div id="msg" class="msg" style="display:none"></div>
+
+      <form id="form">
+        <div class="form-group">
+          <label class="form-label" for="name">name</label>
+          <input id="name" type="text" class="form-input" placeholder="Jane Doe" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="email">email</label>
+          <input id="email" type="email" class="form-input" placeholder="jane@example.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="password">password</label>
+          <input id="password" type="password" class="form-input" required>
+          <span class="form-hint">10–128 chars · uppercase · lowercase · digit · special char · no spaces</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="role">role</label>
+          <select id="role" class="form-input" required>
+            <option value="member">member</option>
+            <option value="trainer">trainer</option>
+          </select>
+        </div>
+        <button type="submit" id="btn" class="btn btn-primary btn-full">Register</button>
+      </form>
+
+      <div class="auth-footer">Already have an account? <a href="login.html">Log in</a></div>
+    </div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    if (isLoggedIn()) window.location.href = 'classes.html';
+
+    document.getElementById('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const msgEl = document.getElementById('msg');
+      const btn   = document.getElementById('btn');
+      hideMsg(msgEl);
+      btn.disabled = true;
+      btn.textContent = 'Registering…';
+
+      const name     = document.getElementById('name').value.trim();
+      const email    = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const role     = document.getElementById('role').value;
+
+      try {
+        await apiFetch('/auth/register', { method:'POST', body: JSON.stringify({ name, email, password, role }) });
+        const data = await apiFetch('/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
+        saveLoginData(data.access_token, name);
+        window.location.href = 'classes.html';
+      } catch (err) {
+        showMsg(msgEl, err.message);
+        btn.disabled = false;
+        btn.textContent = 'Register';
+      }
+    });
+  </script>
+</body>
+</html>
