@@ -171,53 +171,64 @@ Once the server is running, open [http://127.0.0.1:8000](http://127.0.0.1:8000) 
 
 Most endpoints require a JWT token. Here's how to authenticate:
 
-1. **Register an account** — use `POST /users/register` (member) or `POST /users/trainer/register` (trainer)
-2. **Log in** — use `POST /users/login` (member) or `POST /users/trainer/login` (trainer)
+1. **Register an account** — use `POST /auth/register` and set `"role"` to `"member"` or `"trainer"`
+2. **Log in** — use `POST /auth/login`
 3. **Copy the `access_token`** from the login response
 4. **Click the "Authorize" button** at the top of the Swagger page
 5. In the "Bearer" field, enter: `Bearer <your_token>` (include the word `Bearer` followed by a space, then the token)
 6. Click **Authorize** then **Close** — all subsequent requests will include your token
 
+### Creating a class in Swagger
+
+When using `POST /classes/` to create a class, Swagger pre-fills the request body with all available fields, including the optional recurring class fields (`recurrence` and `recurrence_end_date`).
+
+- **To create a single (one-off) class:** delete the `recurrence` and `recurrence_end_date` lines entirely from the request body before submitting. Those fields must be absent — not empty — for the API to create a single class.
+- **To create a recurring class:** keep both `recurrence` (e.g. `"daily"` or `"weekly"`) and `recurrence_end_date` (the last date of the series in `YYYY-MM-DD` format) in the body.
+
 ---
 
 ## API Endpoints
 
-### Users (`/users`)
+### Auth (`/auth`)
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/users/register` | None | Register a new member account |
-| POST | `/users/login` | None | Log in as a member, returns JWT |
-| POST | `/users/trainer/register` | None | Register a new trainer account |
-| POST | `/users/trainer/login` | None | Log in as a trainer, returns JWT |
+| POST | `/auth/register` | None | Register a new member or trainer account (set `"role"` to `"member"` or `"trainer"`) |
+| POST | `/auth/login` | None | Log in as a member or trainer, returns JWT `access_token` |
 
 **Password policy:** 10–128 characters, must include at least one uppercase letter, one lowercase letter, one digit, and one special character. No spaces allowed.
 
 ---
 
-### Member (`/member`)
+### Users (`/users`)
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/member` | None | View all upcoming fitness classes |
-| POST | `/member/<class_id>/book` | Member JWT | Book a spot in a class |
+| POST | `/users/me/book/<class_id>` | Member JWT | Book a spot in a class |
+| GET | `/users/me/book` | Member JWT | List all classes the current member is enrolled in |
+| PUT | `/users/me/notifications` | Member JWT | Update email / Telegram notification preferences |
+| GET | `/users/me/telegram/link` | Member JWT | Generate a one-time Telegram deep link to link your account (expires in 10 minutes) |
+| POST | `/users/telegram/webhook` | Telegram server | Webhook called by Telegram to complete account linking — not for direct use |
 
 ---
 
-### Admin (`/admin`)
+### Classes (`/classes`)
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | `/admin/` | Trainer JWT | Create a new fitness class |
-| GET | `/admin/<class_id>/members` | Trainer JWT | View all members booked in a class |
-| POST | `/admin/<class_id>/remind` | Trainer JWT | Send reminder emails to all enrolled members in the class (only the assigned trainer can send) |
+| GET | `/classes/` | None | View all upcoming fitness classes |
+| POST | `/classes/` | Trainer JWT | Create a new fitness class (one-off or recurring) |
+| GET | `/classes/<class_id>/members` | Trainer JWT | View all members enrolled in a class |
+| POST | `/classes/<class_id>/remind` | Trainer JWT | Send reminders to all enrolled members (only the assigned trainer can send) |
 
-**Class fields when creating:**
+**Class fields when creating (`POST /classes/`):**
 - `class_name`, `class_description`, `trainer_name` — strings
-- `class_date` — date in `YYYY-MM-DD` format (must be today or future)
+- `class_date` — date in `YYYY-MM-DD` format (must be today or in the future)
 - `class_start_time`, `class_end_time` — time in `HH:MM` format (24-hour)
 - `class_room_number` — string
 - `class_capacity` — integer
+- `recurrence` *(optional)* — recurrence pattern: `"daily"` or `"weekly"`. Omit entirely for a one-off class.
+- `recurrence_end_date` *(optional, required when `recurrence` is set)* — last date of the recurring series in `YYYY-MM-DD` format
 
 ---
 
