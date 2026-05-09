@@ -236,9 +236,11 @@ deactivate
 ```
 
 ---
-## Deployed URL for Swagger UI
+## Deployed Frontend URL
 
 http://167.99.253.69/
+
+A frontend interface was implemented as an additional bonus feature beyond the sprint requirements.
 
 ## Member Responsibilities 
 
